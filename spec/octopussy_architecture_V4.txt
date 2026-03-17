@@ -54,6 +54,8 @@ Configuration Reference
 Capability Lifecycle &amp; Registry
 Project Directory Structure
 Appendix A: Open Source Stack
+ADDENDUM A — END-TO-END WORKFLOW CATALOGUE
+ADDENDUM B — SYSTEM ARCHITECTURE DIAGRAM
 
 
 1. VISION &amp; POSITIONING
@@ -5331,6 +5333,958 @@ Config watching
 watchfiles
 ≥0.21
 File change detection
+
+
+
+ADDENDUM A — END-TO-END WORKFLOW CATALOGUE
+Addendum Status: Normative
+Addendum Version: 1.0 (for Octopussy 4.0.1)
+This addendum specifies all primary end-to-end operational workflows of the Octopussy platform. Each workflow is described as an ordered sequence of steps, identifying the Capabilities, Ports, and message types involved at each stage. All workflows are fully consistent with CCA 0.2, the six-phase Capability lifecycle, the zero-trust security chain, and the async Actor model.
+
+A.1 Platform Startup Workflow
+Trigger: octopussy start (CLI) or asyncio.run(main()) (programmatic)
+Outcome: All 26 Capability Instances are running and ready to accept work.
+1.  main() invoked
+    │
+2.  OctopussyCapabilityRegistry instantiated
+    │
+3.  register_all_capabilities(registry) called
+    │   └── All 26 Capabilities registered with dependency declarations
+    │       Circular dependency check: Kahn's algorithm applied at registration time
+    │       CircularDependencyError raised immediately if cycle detected
+    │
+4.  OctopussyCapabilityLifecycleManager (OCLM) instantiated with registry
+    │
+5.  OCLM computes topological startup order (Kahn's algorithm)
+    │
+6.  OCLM executes six-phase lifecycle for each Capability in topological order:
+    │
+    │   Phase 1 — instantiate()
+    │       CapabilityFactory creates each Capability Instance exactly once
+    │
+    │   Phase 2 — initialize()
+    │       Each Capability loads its configuration via ConfigurationPort
+    │       SecretsCapability starts first (no dependencies)
+    │       ObservabilityCapability starts second (Sidecar — before all others)
+    │
+    │   Phase 3 — inject_dependency()
+    │       OCLM resolves all Requirement interfaces
+    │       Injects references into each Capability via inject_dependency()
+    │
+    │   Phase 4 — start()
+    │       Each Capability starts its async tasks and background loops
+    │       MessagingCapability connects to NATS.io (or RabbitMQ)
+    │       SchedulerCapability loads cron schedules
+    │       ToolRegistryCapability registers all built-in tools
+    │       PluginCapability loads all plugins from plugins_dir
+    │
+    │   [Runtime] — Capability is live and processing
+    │
+7.  SIGINT / SIGTERM handler registered on asyncio event loop
+    │
+8.  shutdown_event.wait() — platform blocks here until signal received
+
+Invariants:
+
+ObservabilityCapability is always the first non-root Capability to start.
+SecretsCapability has no dependencies and is always first.
+No Capability's start() is called before all its dependencies have completed start().
+Startup order is deterministic and reproducible across restarts.
+
+
+A.2 Agent Creation Workflow
+Trigger: OrchestratorCapability.dispatch_task() or AgentFactoryCapability.create_agent() called directly.
+Outcome: A fully initialized, running OctopussyAgent instance is registered and processing messages.
+1.  Caller invokes AgentFactoryCapability.create_agent(config_path)
+    │
+2.  AgentFactoryCapability.AgentConfigValidator validates the Markdown/JSON config
+    │   └── Raises AgentConfigValidationError if invalid
+    │
+3.  AgentSpecBuilder constructs a frozen AgentSpec dataclass
+    │   └── AgentSpec includes: agent_id (UUID), name, agent_type,
+    │       intelligence (LLM routing strategy), allowed_tools,
+    │       permissions (max_loop_iterations, token_budget), memory config
+    │
+4.  AgentSpec cached in AgentSpecCache (keyed by agent_id)
+    │
+5.  AgentFactoryCapability resolves all required ports via inject_dependency():
+    │   ├── LLMRouterCapability.resolve_llm_port(spec.intelligence) → LLMPort
+    │   ├── MemoryCapability → MemoryPort
+    │   ├── RAGCapability → RAGPort
+    │   ├── GraphRAGCapability → GraphPort
+    │   ├── ToolRegistryCapability → ToolExecutorPort
+    │   ├── SandboxCapability → SandboxPort
+    │   ├── TokenBudgetCapability → TokenBudgetPort
+    │   ├── SecurityCapability → SecurityPort
+    │   ├── MessagingCapability → MessagingContract
+    │   └── ObservabilityCapability → ObservabilityPort
+    │
+6.  OctopussyAgent subclass instantiated (StatelessOneShot | StatefulLoop |
+    │   ScheduledTaskDaemon) with all resolved ports injected
+    │
+7.  AgentLifecycleManagerCapability.transition_state(agent_id, CREATED)
+    │
+8.  agent.start() called:
+    │   ├── asyncio.create_task(_message_loop())
+    │   ├── asyncio.create_task(_outbound_dispatch_loop())
+    │   └── asyncio.create_task(_heartbeat_loop())
+    │
+9.  AgentLifecycleManagerCapability.transition_state(agent_id, IDLE)
+    │
+10. AgentHandle returned to caller (contains agent_id, status endpoint)
+    │
+11. ObservabilityCapability logs agent creation event + emits metric
+        agent_created_total{agent_type, llm_strategy}
+
+
+A.3 Single-Agent Task Execution Workflow
+Trigger: An OctopussyMessage of type TASK is enqueued into an agent's inQ.
+Outcome: The agent produces a result and enqueues a RESULT message into outQ.
+1.  Caller creates message:
+    │   OctopussyMessage.create(
+    │       sender_id, recipient_id, payload, priority, ttl_seconds,
+    │       secret=hmac_secret
+    │   )
+    │   └── HMAC-SHA256 signature computed and embedded (bytes, never Optional)
+    │
+2.  Message enqueued into agent.inQ (asyncio.PriorityQueue)
+    │   └── Priority tuple: (MessagePriority.value, message)
+    │       CRITICAL=0 processed first → HIGH=1 → NORMAL=2 → LOW=3
+    │
+3.  _message_loop() dequeues message
+    │
+4.  Security chain applied (Chain of Responsibility):
+    │   ├── verify_signature()     → drop + audit if HMAC invalid
+    │   ├── is_expired()           → drop + audit if TTL exceeded
+    │   ├── _handle_control()      → if CONTROL type: pause/resume/stop
+    │   ├── scan_prompt()          → SecurityCapability.scan_prompt()
+    │   │                            block + audit if injection detected
+    │   └── check_budget()         → TokenBudgetCapability.check_budget()
+    │                                block + audit if budget exhausted
+    │
+5.  AgentStateMachine.transition(IDLE → PROCESSING)
+    │
+6.  process_task() invoked (Template Method — subclass implements this)
+    │
+7.  Agent builds prompt via PromptEngineCapability (if configured)
+    │
+8.  Agent calls LLM:
+    │   ├── TokenBudgetCapability.check_budget(agent_id, period) → abort if exhausted
+    │   ├── LLMPortAdapter._call_llm(LLMRequest)
+    │   │   ├── Retry + exponential backoff (up to 3 attempts)
+    │   │   ├── Circuit breaker check (OPEN → fail fast)
+    │   │   └── Fallback to next provider if primary fails
+    │   ├── LLMCompletion returned
+    │   └── TokenBudgetCapability.record_usage(input_tokens, output_tokens)
+    │
+9.  ReflectionEngine evaluates output (ReAct pattern)
+    │   └── If reflection triggers revision: loop back to step 7
+    │       LoopGuard increments counter; raises LoopLimitExceededError
+    │       if max_loop_iterations exceeded
+    │
+10. CritiqueCapability.critique(output) called if agent has critique enabled
+    │   └── If critique requests revision: loop back to step 7 (LoopGuard applies)
+    │
+11. SecurityCapability.validate_output(output, policy)
+    │   └── Block + audit if guardrail violated
+    │
+12. Result OctopussyMessage.create() — RESULT type, HMAC-signed
+    │
+13. Result enqueued into outQ (asyncio.PriorityQueue)
+    │
+14. _outbound_dispatch_loop() dequeues result → MessagingCapability → recipient inQ
+    │
+15. AgentStateMachine.transition(PROCESSING → IDLE)
+    │
+16. ObservabilityCapability:
+        ├── end_span(trace_id)
+        ├── metric: agent_task_duration_seconds, agent_task_success_total
+        └── audit: TASK_COMPLETED event
+
+
+A.4 Multi-Agent Team Task Workflow — Coordinator/Worker Pattern
+Trigger: TeamCapability.submit_team_task(team_id, task) called.
+Outcome: Coordinator synthesizes worker results and delivers a unified team result.
+1.  TeamCapability.submit_team_task(team_id, task, priority)
+    │
+2.  TeamOrchestrator retrieves TeamSpec from TeamStateStore
+    │
+3.  CoordinatorWorkerEngine activated:
+    │
+4.  Coordinator agent receives task via inQ (OctopussyMessage, TASK type)
+    │
+5.  Coordinator decomposes task into N subtasks (via LLM call, step A.3)
+    │
+6.  For each subtask:
+    │   ├── OctopussyMessage.create(coordinator_id, worker_id, subtask, ...)
+    │   └── Message enqueued into worker agent's inQ via MessagingCapability
+    │
+7.  Each Worker agent executes subtask (workflow A.3, steps 4–15)
+    │   └── Worker enqueues RESULT message → outQ → MessagingCapability
+    │           → Coordinator's inQ
+    │
+8.  Coordinator collects all worker RESULT messages
+    │   └── Timeout enforced (team.execution.timeout_seconds)
+    │       Timed-out workers: result marked as PARTIAL
+    │
+9.  ResultSynthesizer applies configured strategy:
+    │   ├── coordinator  — Coordinator LLM synthesizes final answer
+    │   ├── vote         — Majority vote across worker results
+    │   └── concat       — Results concatenated in worker order
+    │
+10. Final RESULT OctopussyMessage created and delivered to original caller
+    │
+11. TeamStateStore updated; team metrics emitted:
+        team_task_duration_seconds, team_task_success_total,
+        team_worker_results_received_total
+
+
+A.5 Multi-Agent Team Task Workflow — Pipeline Pattern
+Trigger: TeamCapability.submit_team_task(team_id, task) on a Pipeline team.
+Outcome: Task flows sequentially through N agents; final agent's output is the result.
+1.  TeamCapability.submit_team_task(team_id, task, priority)
+    │
+2.  PipelineEngine retrieves ordered agent list from TeamSpec
+    │
+3.  Initial OctopussyMessage(task) → Agent[0].inQ
+    │
+4.  Agent[0] executes task (workflow A.3)
+    │   └── Produces RESULT → outQ → MessagingCapability → Agent[1].inQ
+    │
+5.  Agent[1] receives Agent[0]'s output as its input task
+    │   └── Executes (workflow A.3) → RESULT → Agent[2].inQ
+    │
+6.  ... repeated for Agent[2] through Agent[N-1] ...
+    │
+7.  Agent[N-1] produces final RESULT
+    │   └── Delivered to original caller via MessagingCapability
+    │
+8.  PipelineEngine records pipeline completion; emits metrics
+    │
+    NOTE: Each inter-agent message is a fully signed OctopussyMessage.
+          No direct method calls between agents at any stage.
+          Each agent applies the full security chain (step A.3, step 4).
+
+
+A.6 Multi-Agent Team Task Workflow — Mesh + Blackboard Pattern
+Trigger: TeamCapability.submit_team_task(team_id, task) on a Mesh+Blackboard team.
+Outcome: Agents collaborate peer-to-peer via a shared Redis-backed Blackboard; consensus result emerges.
+1.  TeamCapability.submit_team_task(team_id, task, priority)
+    │
+2.  MeshBlackboardEngine broadcasts task to all mesh agents via MessagingCapability
+    │   └── OctopussyMessage(TASK) → each agent's inQ simultaneously
+    │
+3.  Each agent reads from and writes to BlackboardStore (Redis):
+    │   ├── Reads: partial results, context, peer findings
+    │   └── Writes: own findings, intermediate conclusions
+    │   All blackboard reads/writes are atomic (Redis transactions)
+    │
+4.  Agents iterate (up to max_rounds):
+    │   ├── Each agent reads the current blackboard state
+    │   ├── Executes its subtask (workflow A.3)
+    │   └── Writes updated findings to blackboard
+    │
+5.  Convergence check after each round:
+    │   └── If all agents agree (or max_rounds reached): proceed to step 6
+    │
+6.  ResultSynthesizer reads final blackboard state
+    │   └── Applies configured synthesis strategy (coordinator | vote | concat)
+    │
+7.  Final RESULT delivered to original caller
+    │
+8.  BlackboardStore cleared for this task_id; metrics emitted
+
+
+A.7 Tool Execution Workflow (MCP)
+Trigger: Agent calls a tool inside process_task().
+Outcome: Tool result returned to agent; sandbox enforced throughout.
+1.  Agent invokes ToolRegistryCapability.execute_tool(tool_id, input, agent_context)
+    │
+2.  ToolRegistryCapability checks agent permission:
+    │   └── tool_id ∈ agent_spec.permissions.allowed_tools?
+    │       NO → raise ToolPermissionError (deny-by-default)
+    │
+3.  Input validated against tool's JSON input schema
+    │   └── Raise ToolInputValidationError if invalid
+    │
+4.  SandboxCapability creates isolated execution environment:
+    │   ├── Docker container (DOCKER profile)
+    │   ├── gVisor sandbox (KUBERNETES profile)
+    │   ├── seccomp filter (LOCAL profile)
+    │   └── macOS sandbox (macOS LOCAL profile)
+    │
+5.  MCPClientAdapter constructs MCP tool call request:
+    │   ├── Transport: MCP 2025-11-25 Streamable HTTP (MCPCommunicationPort)
+    │   ├── Header: MCP-Protocol-Version: 2025-11-25 (mandatory)
+    │   └── Endpoint: https://host:47203/mcp/tools/call
+    │
+6.  Tool executes inside sandbox:
+    │   ├── Network access: enforced per tool's network_required flag
+    │   │   (explicit allowlist; default: disabled)
+    │   └── Filesystem access: restricted to sandbox working directory
+    │
+7.  Tool result returned via MCP Streamable HTTP response
+    │
+8.  Output validated against tool's JSON output schema
+    │   └── Raise ToolOutputValidationError if invalid
+    │
+9.  SandboxCapability tears down sandbox environment
+    │
+10. Tool result returned to agent's process_task()
+    │
+11. ObservabilityCapability:
+        ├── metric: tool_execution_duration_seconds{tool_id}
+        ├── metric: tool_execution_success_total{tool_id}
+        └── audit: TOOL_EXECUTED event (tool_id, agent_id, success, duration)
+
+
+A.8 Error Handling &amp; Dead Letter Queue (DLQ) Workflow
+Trigger: Message delivery fails after dlq.max_retries attempts, or an agent raises an unhandled exception.
+Outcome: Message is persisted to the DLQ; alert emitted; agent transitions to ERROR state if applicable.
+SCENARIO A — Message delivery failure:
+
+1.  MessagingCapability attempts to deliver OctopussyMessage to recipient
+    │
+2.  Delivery fails (recipient unreachable, queue full, network error)
+    │
+3.  RetryPolicy applies exponential backoff:
+    │   Attempt 1 → wait 1s → Attempt 2 → wait 2s → Attempt 3 → wait 4s
+    │   (max_retries = 3 per octopussy.yaml dlq config)
+    │
+4.  All retries exhausted:
+    │
+5.  DLQPort.send_to_dlq(message, reason, attempt_count) called
+    │
+6.  DLQStore persists message (SQLite or Redis per dlq.persist_backend)
+    │   └── Stored with: original_message, failure_reason, timestamp,
+    │                    sender_id, recipient_id, attempt_count
+    │
+7.  ObservabilityCapability:
+    │   ├── metric: dlq_messages_total{reason}
+    │   └── audit: MESSAGE_DLQ event
+    │
+8.  Alert emitted if dlq_messages_total exceeds configured threshold
+
+SCENARIO B — Agent unhandled exception during process_task():
+
+1.  Exception raised inside agent.process_task()
+    │
+2.  _message_loop() catches exception (no swallowed exceptions)
+    │
+3.  ObservabilityCapability.log(ERROR, exception, full trace context)
+    │
+4.  AgentStateMachine.transition(PROCESSING → ERROR)
+    │
+5.  AgentLifecycleManagerCapability.transition_state(agent_id, ERROR)
+    │
+6.  Original message routed to DLQ (steps 5–8 of Scenario A)
+    │
+7.  Recovery policy applied per AgentSpec:
+    │   ├── AUTO_RESTART: AgentLifecycleManagerCapability restarts agent
+    │   │   (transition: ERROR → STOPPING → STOPPED → CREATED → IDLE)
+    │   └── MANUAL: agent remains in ERROR state; operator intervention required
+    │
+8.  ObservabilityCapability:
+        ├── metric: agent_errors_total{agent_id, error_type}
+        └── audit: AGENT_ERROR event
+
+
+A.9 Plugin Hot-Reload Workflow
+Trigger: octopussy plugin reload <plugin_id> (CLI) or PluginCapability.hot_reload_plugin(plugin_id) (API).
+Outcome: New plugin version is live without platform restart; zero downtime.
+1.  PluginCapability.hot_reload_plugin(plugin_id) called
+    │
+2.  PluginCapability reads updated plugin.json from plugins_dir
+    │
+3.  Validation:
+    │   ├── plugin_id matches registered plugin
+    │   ├── entry_point module is importable
+    │   └── plugin_type is a valid PluginType enum value
+    │
+4.  Old plugin instance gracefully stopped:
+    │   └── If plugin has a stop() hook: called with 5s timeout
+    │
+5.  Python module reloaded via importlib.reload()
+    │
+6.  New plugin instance created and initialized
+    │
+7.  Target Capability updated:
+    │   ├── TOOL_PLUGIN       → ToolRegistryCapability re-registers tool
+    │   ├── LLM_ADAPTER_PLUGIN → LLMRouterCapability updates provider registry
+    │   ├── COMM_ADAPTER_PLUGIN → CommunicationAdapterCapability updates ChannelRegistry
+    │   ├── VECTOR_DB_PLUGIN  → RAGCapability updates backend adapter
+    │   ├── GRAPH_DB_PLUGIN   → GraphRAGCapability updates backend adapter
+    │   └── MCP_SERVER_PLUGIN → PluginCapability updates OctopussyMCPServer tool list
+    │
+8.  ObservabilityCapability:
+    │   ├── metric: plugin_hot_reloads_total{plugin_id, plugin_type}
+    │   └── audit: PLUGIN_HOT_RELOADED event
+    │
+9.  CLI confirms: "Plugin <plugin_id> v<version> hot-reloaded successfully."
+    │
+    NOTE: No Capability restart required. No message loss. In-flight
+          tool calls using the old plugin complete before teardown.
+
+
+A.10 Scheduled Task Execution Workflow
+Trigger: SchedulerCapability fires a cron trigger for a ScheduledTaskDaemon agent.
+Outcome: Agent executes its scheduled task and returns to sleep until the next cron tick.
+1.  SchedulerCapability.CronEngine evaluates all registered cron expressions
+    │   (APScheduler backend; sub-second precision)
+    │
+2.  Cron expression matches current time for agent_id X
+    │
+3.  SchedulerCapability.TaskTrigger fires:
+    │   └── OctopussyMessage.create(
+    │           sender_id=SCHEDULER_SYSTEM_ID,
+    │           recipient_id=agent_id,
+    │           message_type=TASK,
+    │           payload={"trigger": "cron", "schedule": cron_expr},
+    │           priority=NORMAL,
+    │           secret=hmac_secret
+    │       )
+    │
+4.  Message enqueued into ScheduledTaskDaemon.inQ via MessagingCapability
+    │
+5.  Agent wakes from IDLE state:
+    │   AgentStateMachine.transition(IDLE → PROCESSING)
+    │
+6.  Agent executes process_task() (full workflow A.3, steps 6–15)
+    │
+7.  Agent returns to IDLE state:
+    │   AgentStateMachine.transition(PROCESSING → IDLE)
+    │
+8.  Agent sleeps until next cron tick (no busy-wait; asyncio event-driven)
+    │
+9.  ObservabilityCapability:
+        ├── metric: scheduled_task_executions_total{agent_id, schedule}
+        ├── metric: scheduled_task_duration_seconds{agent_id}
+        └── audit: SCHEDULED_TASK_EXECUTED event
+
+
+A.11 MCP Client Tool Call Workflow (Agent → External MCP Server)
+Trigger: Agent calls an external MCP server tool inside process_task().
+Outcome: External tool result returned to agent via MCP 2025-11-25 Streamable HTTP.
+1.  Agent's process_task() invokes MCPClientAdapter.call_tool(server_url, tool_name, args)
+    │
+2.  MCPClientAdapter retrieves server credentials from SecretsCapability
+    │
+3.  HTTP session established (httpx.AsyncClient, TLS verified):
+    │   └── Connection pooled per server_url (reused across calls)
+    │
+4.  MCP tool call request constructed:
+    │   ├── Method: POST https://<server_url>/mcp/tools/call
+    │   ├── Header: MCP-Protocol-Version: 2025-11-25  ← mandatory
+    │   ├── Header: Authorization: Bearer <jwt_token>
+    │   └── Body: {"tool": tool_name, "arguments": args}
+    │
+5.  Request sent via MCPCommunicationPort (Streamable HTTP transport)
+    │
+6.  Streaming response consumed:
+    │   └── Intermediate streamed chunks buffered until complete
+    │
+7.  MCP-Protocol-Version response header validated:
+    │   └── If version mismatch: raise MCPProtocolVersionError
+    │
+8.  Tool result deserialized and returned to agent
+    │
+9.  Retry policy applied on transient failures:
+    │   └── Up to 3 attempts with exponential backoff
+    │       Circuit breaker opens after 5 consecutive failures
+    │
+10. ObservabilityCapability:
+        ├── metric: mcp_client_calls_total{server_url, tool_name, status}
+        ├── metric: mcp_client_call_duration_seconds{server_url, tool_name}
+        └── span: MCP_CLIENT_CALL (trace_id propagated)
+
+
+A.12 Platform Shutdown Workflow
+Trigger: SIGINT or SIGTERM received by the platform process.
+Outcome: All Capabilities stopped gracefully in strict reverse topological order; no message loss.
+1.  Signal handler sets shutdown_event
+    │
+2.  main() exits shutdown_event.wait()
+    │
+3.  lifecycle_manager.stop_all() called
+    │
+4.  OCLM computes reverse topological order
+    │
+5.  For each Capability in reverse topological order:
+    │
+    │   Phase 5 — stop()
+    │       ├── OrchestratorCapability: stops accepting new requests
+    │       ├── SchedulerCapability: cancels pending triggers
+    │       ├── All AgentInstances: agent.stop() called
+    │       │   ├── _stop_event.set()
+    │       │   ├── _message_loop() drains inQ (processes remaining messages)
+    │       │   ├── _outbound_dispatch_loop() drains outQ
+    │       │   └── AgentStateMachine.transition(IDLE → STOPPING → STOPPED)
+    │       ├── MessagingCapability: flushes outbound queues; disconnects from NATS/RabbitMQ
+    │       └── ObservabilityCapability: flushes all pending spans/metrics/logs
+    │
+    │   Phase 6 — cleanup()
+    │       └── Each Capability releases all resources:
+    │           database connections, file handles, HTTP sessions, async tasks
+    │
+6.  All asyncio tasks cancelled and awaited
+    │
+7.  Process exits cleanly (exit code 0)
+    │
+    NOTE: In-flight OctopussyMessages that cannot be delivered during shutdown
+          are routed to the DLQ (workflow A.8) before MessagingCapability stops.
+          No message is silently dropped.
+
+
+A.13 Inbound Channel Message Workflow (External User → Agent)
+Trigger: A user sends a message on an external channel (Telegram, Slack, WhatsApp, etc.).
+Outcome: Agent processes the message and delivers a response back to the user on the same channel.
+1.  External channel delivers event to CommunicationAdapterCapability:
+    │   ├── Telegram: webhook POST to CommunicationAdapterCapability REST endpoint
+    │   ├── Slack: Slack Events API POST
+    │   └── WhatsApp: WhatsApp Business API webhook
+    │
+2.  ChannelRegistry routes event to the correct adapter
+    │   (TelegramAdapter | SlackAdapter | WhatsAppAdapter | ...)
+    │
+3.  MessageBridge converts channel-native payload → OctopussyMessage:
+    │   ├── sender_id: derived from channel user identity
+    │   ├── recipient_id: resolved from UserSessionCapability (session lookup)
+    │   ├── payload: normalized message text / media reference
+    │   └── HMAC-SHA256 signature applied
+    │
+4.  UserSessionCapability.validate_session(channel_user_token):
+    │   └── If no active session: create_session() → JWT issued
+    │
+5.  SecurityCapability.authenticate() + authorize() applied
+    │
+6.  OctopussyMessage enqueued into target agent's inQ via MessagingCapability
+    │
+7.  Agent processes message (full workflow A.3)
+    │
+8.  Agent produces RESULT OctopussyMessage → outQ → MessagingCapability
+    │
+9.  CommunicationAdapterCapability.MessageBridge converts RESULT → channel-native response
+    │
+10. Channel adapter delivers response to user:
+    │   ├── Telegram: sendMessage API call
+    │   ├── Slack: chat.postMessage API call
+    │   └── WhatsApp: messages API call
+    │
+11. ObservabilityCapability:
+        ├── metric: channel_messages_received_total{channel}
+        ├── metric: channel_messages_sent_total{channel}
+        └── audit: CHANNEL_MESSAGE_PROCESSED event
+
+
+
+ADDENDUM B — SYSTEM ARCHITECTURE DIAGRAM
+Addendum Status: Normative
+Addendum Version: 1.0 (for Octopussy 4.0.1)
+This addendum provides the authoritative system-level architecture diagram for Octopussy v4.0.1. The diagram is presented in structured ASCII art, organized by architectural layer. All 26 Capabilities, all communication ports, all external integrations, and all deployment boundaries are represented. The diagram is consistent with the CCA 0.2 Capability Map (Chapter 3) and all Capability specifications (Chapter 4).
+
+B.1 Legend
+┌─────────────────────┐
+│  Capability         │  CCA 0.2 Capability Instance
+└─────────────────────┘
+
+╔═════════════════════╗
+║  External System    ║  Outside Octopussy platform boundary
+╚═════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━  Synchronous call / dependency injection
+─ ─ ─ ─ ─ ─ ─ ─ ─ ─  Async message (OctopussyMessage via MessagingCapability)
+══════════════════════  External protocol boundary (REST/gRPC/MCP/WSS/NATS)
+[Port]                 CommunicationPort or domain Port interface
+[DI]                   Dependency Injection (inject_dependency())
+[Sidecar]              Runs independently; starts before all others
+
+
+B.2 Full System Architecture Diagram
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                         EXTERNAL CLIENTS &amp; CHANNELS                            ║
+║                                                                                  ║
+║  ╔══════════╗  ╔══════════╗  ╔══════════╗  ╔══════════╗  ╔════════════════════╗ ║
+║  ║ REST API ║  ║ gRPC API ║  ║  WebUI   ║  ║   CLI    ║  ║ Telegram/Slack/    ║ ║
+║  ║  Client  ║  ║  Client  ║  ║ Browser  ║  ║  User    ║  ║ WhatsApp/Signal/   ║ ║
+║  ╚════╤═════╝  ╚════╤═════╝  ╚════╤═════╝  ╚════╤═════╝  ║ Messenger          ║ ║
+║       │ HTTPS       │ gRPC        │ WSS          │ CLI     ╚═════════╤══════════╝ ║
+║       │ :47200      │ :47201      │ :47202       │                   │ Webhooks   ║
+╚═══════╪═════════════╪═════════════╪══════════════╪═══════════════════╪════════════╝
+        │             │             │              │                   │
+┌───────▼─────────────▼─────────────▼──────────────▼───────────────────▼────────────┐
+│                         OCTOPUSSY PLATFORM BOUNDARY                                │
+│                                                                                    │
+│  ┌──────────────────────────────────────────────────────────────────────────────┐  │
+│  │  [Sidecar]  ObservabilityCapability                                          │  │
+│  │  TracingEngine │ LoggingEngine │ MetricsEngine │ AuditEngine                 │  │
+│  │  OTLPExporter (:4317) │ PrometheusExporter (:9090)                          │  │
+│  │  ObservabilityPort ──[DI]──► injected into ALL 26 Capabilities              │  │
+│  └──────────────────────────────────────────────────────────────────────────────┘  │
+│                                                                                    │
+│  ┌─────────────────────┐    ┌──────────────────────┐    ┌───────────────────────┐  │
+│  │ OrchestratorCapab.  │    │  WebUICapability      │    │  CLICapability        │  │
+│  │ TaskAnalyzer        │    │  DashboardController  │    │  CLICommandParser     │  │
+│  │ AgentSelector       │    │  FastAPIStaticServer  │    │  CLIDispatcher        │  │
+│  │ TaskDispatcher      │    │  [WSS :47202]         │    │  [stdin/stdout]       │  │
+│  │ ResultAggregator    │    └──────────┬────────────┘    └──────────┬────────────┘  │
+│  │ SystemMonitor       │               │                             │               │
+│  │ [REST :47200]       │               │                             │               │
+│  │ [gRPC :47201]       │               └─────────────────────────────┘               │
+│  │ [WSS  :47202]       │                           │                                 │
+│  └──────────┬──────────┘                           │                                 │
+│             │                                      ▼                                 │
+│             │                    ┌─────────────────────────────┐                     │
+│             │                    │  UserSessionCapability       │                     │
+│             │                    │  SessionStore (Redis/SQLite) │                     │
+│             │                    │  JWT (RS256), TTL: 8h        │                     │
+│             │                    └─────────────────────────────┘                     │
+│             │                                                                        │
+│  ┌──────────▼──────────────────────────────────────────────────────────────────┐    │
+│  │                        CORE ORCHESTRATION LAYER                              │    │
+│  │                                                                              │    │
+│  │  ┌───────────────────────┐      ┌──────────────────────────────────────┐    │    │
+│  │  │ AgentFactoryCapab.    │      │ AgentLifecycleManagerCapability       │    │    │
+│  │  │ AgentSpecBuilder      │      │ AgentStateMachine Registry            │    │    │
+│  │  │ AgentConfigValidator  │      │ Heartbeat Monitor                     │    │    │
+│  │  │ AgentInstantiator     │      │ CREATED→IDLE→PROCESSING→IDLE          │    │    │
+│  │  │ AgentSpecCache        │      │ →ERROR→STOPPING→STOPPED               │    │    │
+│  │  └──────────┬────────────┘      └──────────────────────────────────────┘    │    │
+│  │             │ creates                                                        │    │
+│  │             ▼                                                                │    │
+│  │  ┌──────────────────────────────────────────────────────────────────────┐   │    │
+│  │  │                    ACTOR LAYER (Agent Instances)                      │   │    │
+│  │  │                                                                       │   │    │
+│  │  │  ┌─────────────────────────────────────────────────────────────────┐ │   │    │
+│  │  │  │  OctopussyAgent (ABC)  [ActorCapability]                        │ │   │    │
+│  │  │  │                                                                  │ │   │    │
+│  │  │  │  inQ (asyncio.PriorityQueue)  ◄── OctopussyMessage (HMAC-signed)│ │   │    │
+│  │  │  │  CRITICAL=0 → HIGH=1 → NORMAL=2 → LOW=3                         │ │   │    │
+│  │  │  │                                                                  │ │   │    │
+│  │  │  │  _message_loop():                                                │ │   │    │
+│  │  │  │    verify_signature() → is_expired() → _handle_control()        │ │   │    │
+│  │  │  │    → scan_prompt() → check_budget() → process_task()            │ │   │    │
+│  │  │  │                                                                  │ │   │    │
+│  │  │  │  outQ (asyncio.PriorityQueue) ──► OctopussyMessage (HMAC-signed)│ │   │    │
+│  │  │  │  _outbound_dispatch_loop() ──► MessagingCapability              │ │   │    │
+│  │  │  │  _heartbeat_loop() ──► AgentLifecycleManagerCapability          │ │   │    │
+│  │  │  │                                                                  │ │   │    │
+│  │  │  │  Subtypes:  StatelessOneShot │ StatefulLoop │ ScheduledTaskDaemon│ │   │    │
+│  │  │  └─────────────────────────────────────────────────────────────────┘ │   │    │
+│  │  │                                                                       │   │    │
+│  │  │  ┌──────────────────────┐  ┌──────────────────────────────────────┐  │   │    │
+│  │  │  │  TeamCapability      │  │  SchedulerCapability                  │  │   │    │
+│  │  │  │  TeamOrchestrator    │  │  CronEngine (APScheduler ≥3.10)      │  │   │    │
+│  │  │  │  CoordWorkerEngine   │  │  TaskTrigger → MessagingCapability    │  │   │    │
+│  │  │  │  PipelineEngine      │  └──────────────────────────────────────┘  │   │    │
+│  │  │  │  MeshBlackboardEngine│                                             │   │    │
+│  │  │  │  TreeEngine          │                                             │   │    │
+│  │  │  │  BlackboardStore     │                                             │   │    │
+│  │  │  │  (Redis-backed)      │                                             │   │    │
+│  │  │  └──────────────────────┘                                             │   │    │
+│  │  └──────────────────────────────────────────────────────────────────────┘   │    │
+│  └──────────────────────────────────────────────────────────────────────────────┘    │
+│                                                                                      │
+│  ┌───────────────────────────────────────────────────────────────────────────────┐   │
+│  │                       INTELLIGENCE &amp; KNOWLEDGE LAYER                          │   │
+│  │                                                                               │   │
+│  │  ┌──────────────────────────────────────────────────────────────────────┐    │   │
+│  │  │  LLMRouterCapability                                                  │    │   │
+│  │  │  RoutingEngine: COST │ QUALITY │ BALANCED │ LOCAL │ CLOUD             │    │   │
+│  │  │  CircuitBreaker + Retry + Fallback chain                              │    │   │
+│  │  │  GPU auto-detect: CUDA │ ROCm │ MPS/MLX │ Intel │ Vulkan │ CPU       │    │   │
+│  │  │                                                                       │    │   │
+│  │  │  LOCAL Ports:  OllamaLLMPort │ LMStudioLLMPort │ VLLMLLMPort        │    │   │
+│  │  │                SGLangLLMPort │ HuggingFaceLLMPort │ MLXLLMPort       │    │   │
+│  │  │  CLOUD Ports:  OpenAILLMPort │ AnthropicLLMPort │ GeminiLLMPort     │    │   │
+│  │  │                BedrockLLMPort │ AzureOpenAILLMPort                   │    │   │
+│  │  │  VLM Ports:    (same providers, VLMPort interface)                   │    │   │
+│  │  └──────────────────────────────────────────────────────────────────────┘    │   │
+│  │                                                                               │   │
+│  │  ┌──────────────────────┐  ┌──────────────────────┐  ┌────────────────────┐  │   │
+│  │  │  MemoryCapability    │  │  RAGCapability        │  │ GraphRAGCapability │  │   │
+│  │  │  ConversationStore   │  │  DocumentChunker      │  │ GraphQueryEngine   │  │   │
+│  │  │  LongTermStore       │  │  EmbeddingEngine      │  │ HopTraverser       │  │   │
+│  │  │  (SQLite/Redis/PG)   │  │  Reranker             │  │ Neo4j │ Memgraph   │  │   │
+│  │  └──────────────────────┘  │  ChromaDB │ PGVector  │  │ ArangoDB           │  │   │
+│  │                            │  Weaviate │ Qdrant    │  └────────────────────┘  │   │
+│  │                            │  Milvus   │ Plugin    │                          │   │
+│  │                            └──────────────────────┘                          │   │
+│  │                                                                               │   │
+│  │  ┌──────────────────────┐  ┌──────────────────────┐  ┌────────────────────┐  │   │
+│  │  │  PromptEngineCapab.  │  │  CritiqueCapability   │  │ TokenBudgetCapab.  │  │   │
+│  │  │  PromptCatalog       │  │  CritiqueEngine       │  │ BudgetStore        │  │   │
+│  │  │  TemplateEngine      │  │  RevisionEngine       │  │ (SQLite/Redis)     │  │   │
+│  │  │  PatternRegistry     │  │  (Critique-and-Revise)│  │ per-agent/period   │  │   │
+│  │  └──────────────────────┘  └──────────────────────┘  └────────────────────┘  │   │
+│  └───────────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                      │
+│  ┌───────────────────────────────────────────────────────────────────────────────┐   │
+│  │                      TOOL &amp; EXECUTION LAYER                                   │   │
+│  │                                                                               │   │
+│  │  ┌──────────────────────────────────────────────────────────────────────┐    │   │
+│  │  │  ToolRegistryCapability                                               │    │   │
+│  │  │  ToolDescriptorStore │ PermissionChecker │ SchemaValidator            │    │   │
+│  │  │                                                                       │    │   │
+│  │  │  Built-in Tools:                                                      │    │   │
+│  │  │  web_search │ web_download │ web_scrape │ file_read │ file_write      │    │   │
+│  │  │  file_delete │ code_execute │ os_command │ ui_automation              │    │   │
+│  │  │  mail_read │ mail_send │ calendar_read │ calendar_write               │    │   │
+│  │  │                                                                       │    │   │
+│  │  │  All tool calls: MCP 2025-11-25 Streamable HTTP → port :47203        │    │   │
+│  │  └──────────────────────────────────────────────────────────────────────┘    │   │
+│  │                                                                               │   │
+│  │  ┌──────────────────────────────────────────────────────────────────────┐    │   │
+│  │  │  SandboxCapability                                                    │    │   │
+│  │  │  Docker │ gVisor │ seccomp │ macOS Sandbox                           │    │   │
+│  │  │  Network allowlist │ Filesystem isolation │ Bulkhead pattern         │    │   │
+│  │  └──────────────────────────────────────────────────────────────────────┘    │   │
+│  └───────────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                      │
+│  ┌───────────────────────────────────────────────────────────────────────────────┐   │
+│  │                    MESSAGING &amp; COMMUNICATION LAYER                            │   │
+│  │                                                                               │   │
+│  │  ┌──────────────────────────────────────────────────────────────────────┐    │   │
+│  │  │  MessagingCapability                                                  │    │   │
+│  │  │  NATSCommunicationPort  (nats://host:4222)  ← default                │    │   │
+│  │  │  RabbitMQCommunicationPort (amqp://host:5672) ← optional             │    │   │
+│  │  │  DLQPort → DLQStore (SQLite │ Redis)                                 │    │   │
+│  │  │  RetryPolicy: 3 attempts, exponential backoff                        │    │   │
+│  │  └──────────────────────────────────────────────────────────────────────┘    │   │
+│  │                                                                               │   │
+│  │  ┌──────────────────────────────────────────────────────────────────────┐    │   │
+│  │  │  CommunicationAdapterCapability                                       │    │   │
+│  │  │  ChannelRegistry │ MessageBridge                                      │    │   │
+│  │  │  TelegramAdapter │ WhatsAppAdapter │ SignalAdapter                    │    │   │
+│  │  │  MessengerAdapter │ SlackAdapter │ [COMM_ADAPTER_PLUGIN]              │    │   │
+│  │  └──────────────────────────────────────────────────────────────────────┘    │   │
+│  │                                                                               │   │
+│  │  ┌──────────────────────────────────────────────────────────────────────┐    │   │
+│  │  │  PluginCapability  [MCP Server — port :47203]                        │    │   │
+│  │  │  OctopussyMCPServer (MCP 2025-11-25 Streamable HTTP)                 │    │   │
+│  │  │  PluginLoader │ PluginRegistry │ HotReloadEngine                     │    │   │
+│  │  │  MCPClientAdapter (outbound → external MCP servers)                  │    │   │
+│  │  └──────────────────────────────────────────────────────────────────────┘    │   │
+│  │                                                                               │   │
+│  │  ┌──────────────────────┐  ┌──────────────────────────────────────────────┐  │   │
+│  │  │  SpeechCapability    │  │  SpeechCapability (cont.)                    │  │   │
+│  │  │  STTEngine (Whisper) │  │  TTSEngine (Coqui/pyttsx3)                  │  │   │
+│  │  └──────────────────────┘  └──────────────────────────────────────────────┘  │   │
+│  └───────────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                      │
+│  ┌───────────────────────────────────────────────────────────────────────────────┐   │
+│  │                       SECURITY &amp; SECRETS LAYER                                │   │
+│  │                                                                               │   │
+│  │  ┌──────────────────────────────────────────────────────────────────────┐    │   │
+│  │  │  SecurityCapability                                                   │    │   │
+│  │  │  AuthenticationEngine (JWT RS256 + TOTP for SUPERUSER/ADMIN)         │    │   │
+│  │  │  AuthorizationEngine (RBAC, deny-by-default, explicit allowlists)    │    │   │
+│  │  │  PromptInjectionScanner │ GuardrailEngine                            │    │   │
+│  │  │  AuditLogger (append-only JSONL — entries never deleted)             │    │   │
+│  │  └──────────────────────────────────────────────────────────────────────┘    │   │
+│  │                                                                               │   │
+│  │  ┌──────────────────────────────────────────────────────────────────────┐    │   │
+│  │  │  SecretsCapability                                                    │    │   │
+│  │  │  LocalEncryptedFileStore (AES-256-GCM) │ HashiCorpVaultAdapter       │    │   │
+│  │  │  AWSSecretsManagerAdapter │ AzureKeyVaultAdapter                     │    │   │
+│  │  │  No dependencies — always starts first                               │    │   │
+│  │  └──────────────────────────────────────────────────────────────────────┘    │   │
+│  └───────────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                      │
+│  ┌───────────────────────────────────────────────────────────────────────────────┐   │
+│  │                     CONFIGURATION &amp; REGISTRY LAYER                            │   │
+│  │                                                                               │   │
+│  │  ┌──────────────────────────────────┐  ┌──────────────────────────────────┐  │   │
+│  │  │  ConfigurationCapability         │  │  OctopussyCapabilityRegistry      │  │   │
+│  │  │  FileWatcher (Observer pattern)  │  │  OctopussyCapabilityLifecycleMgr  │  │   │
+│  │  │  YAMLParser │ EnvOverrideEngine  │  │  (OCLM) — Kahn's algorithm       │  │   │
+│  │  │  /etc/octopussy/octopussy.yaml   │  │  6-phase lifecycle enforcement    │  │   │
+│  │  └──────────────────────────────────┘  └──────────────────────────────────┘  │   │
+│  └───────────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────┘
+
+
+B.3 External Integrations Diagram
+OCTOPUSSY PLATFORM
+        │
+        │  [LLMRouterCapability — LLMPort / VLMPort]
+        ├──────────────────────────────────────────────────────────────────────────────┐
+        │  LOCAL                                    CLOUD                              │
+        │  Ollama (:11434)                          OpenAI API                         │
+        │  LM Studio (:1234)                        Anthropic API                      │
+        │  vLLM (:8000)                             Google Gemini API                  │
+        │  SGLang (:30000)                          AWS Bedrock                        │
+        │  HuggingFace Transformers                 Azure OpenAI                       │
+        │  MLX (Apple Silicon)                                                         │
+        └──────────────────────────────────────────────────────────────────────────────┘
+        │
+        │  [RAGCapability — RAGPort]
+        ├──────────────────────────────────────────────────────────────────────────────┐
+        │  ChromaDB (local file)  │  pgvector (PostgreSQL)  │  Weaviate               │
+        │  Qdrant                 │  Milvus                 │  [VECTOR_DB_PLUGIN]      │
+        └──────────────────────────────────────────────────────────────────────────────┘
+        │
+        │  [GraphRAGCapability — GraphPort]
+        ├──────────────────────────────────────────────────────────────────────────────┐
+        │  Neo4j (bolt://host:7687)  │  Memgraph  │  ArangoDB  │  [GRAPH_DB_PLUGIN]   │
+        └──────────────────────────────────────────────────────────────────────────────┘
+        │
+        │  [MessagingCapability — CommunicationPort]
+        ├──────────────────────────────────────────────────────────────────────────────┐
+        │  NATS.io (nats://host:4222) ← default                                        │
+        │  RabbitMQ (amqp://host:5672) ← optional                                      │
+        └──────────────────────────────────────────────────────────────────────────────┘
+        │
+        │  [SecretsCapability — SecretsPort]
+        ├──────────────────────────────────────────────────────────────────────────────┐
+        │  Local AES-256-GCM file  │  HashiCorp Vault  │  AWS Secrets Manager         │
+        │  Azure Key Vault                                                              │
+        └──────────────────────────────────────────────────────────────────────────────┘
+        │
+        │  [ObservabilityCapability — OTLP / Prometheus]
+        ├──────────────────────────────────────────────────────────────────────────────┐
+        │  OTLP Collector (:4317)  →  Jaeger / Tempo / Grafana                        │
+        │  Prometheus (:9090)      →  Grafana                                          │
+        │  Audit JSONL file        →  SIEM / log aggregator                            │
+        └──────────────────────────────────────────────────────────────────────────────┘
+        │
+        │  [PluginCapability — MCP Server :47203]
+        ├──────────────────────────────────────────────────────────────────────────────┐
+        │  External MCP Clients (IDEs, other AI systems, automation tools)             │
+        │  External MCP Servers (called by MCPClientAdapter from agents)               │
+        └──────────────────────────────────────────────────────────────────────────────┘
+        │
+        │  [MemoryCapability — MemoryPort]
+        └──────────────────────────────────────────────────────────────────────────────┐
+           SQLite (SBC/LOCAL)  │  Redis (DOCKER/KUBERNETES)  │  PostgreSQL (optional)  │
+           └──────────────────────────────────────────────────────────────────────────┘
+
+
+B.4 Capability Startup Order (Topological — Normative)
+The following is the deterministic, OCLM-computed startup order for all 26 Capabilities. Shutdown proceeds in strict reverse order (bottom to top).
+Startup Order (1 = first to start, 26 = last to start)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 1.  SecretsCapability                  (no dependencies)
+ 2.  ObservabilityCapability            [Sidecar] (depends: Secrets, Config)
+     ↑ starts before all others after Secrets
+ 3.  ConfigurationCapability            (depends: Secrets)
+ 4.  SecurityCapability                 (depends: Secrets, Config, Obs)
+ 5.  MessagingCapability                (depends: Config, Obs, Security)
+ 6.  PluginCapability                   (depends: Config, Obs)
+ 7.  SandboxCapability                  (depends: Config, Obs)
+ 8.  ToolRegistryCapability             (depends: Plugin, Sandbox, Security, Obs)
+ 9.  LLMRouterCapability                (depends: Config, Secrets, Plugin, Obs)
+10.  MemoryCapability                   (depends: Config, Obs)
+11.  RAGCapability                      (depends: Config, Plugin, Obs)
+12.  GraphRAGCapability                 (depends: Config, Plugin, Obs)
+13.  TokenBudgetCapability              (depends: Config, Obs)
+14.  PromptEngineCapability             (depends: Config, Plugin, Obs)
+15.  ActorCapability                    (depends: LLMRouter, Memory, RAG, GraphRAG,
+                                                  ToolRegistry, Sandbox, TokenBudget,
+                                                  Security, Messaging, Obs)
+16.  AgentLifecycleManagerCapability    (depends: Config, Obs)
+17.  AgentFactoryCapability             (depends: Config, LLMRouter, Memory, RAG,
+                                                  GraphRAG, ToolRegistry, Sandbox,
+                                                  TokenBudget, Security, Messaging,
+                                                  AgentLifecycleMgr, Obs)
+18.  TeamCapability                     (depends: AgentFactory, Messaging, Obs)
+19.  SchedulerCapability                (depends: Config, Messaging, Obs)
+20.  CritiqueCapability                 (depends: LLMRouter, Obs)
+21.  CommunicationAdapterCapability     (depends: Messaging, Security, Obs)
+22.  SpeechCapability                   (depends: Config, Obs)
+23.  UserSessionCapability              (depends: Config, Obs)
+24.  OrchestratorCapability             (depends: AgentFactory, AgentLifecycleMgr,
+                                                  Team, Messaging, Security, Obs)
+25.  CLICapability                      (depends: Orchestrator, Obs)
+26.  WebUICapability                    (depends: Orchestrator, Obs)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Shutdown: 26 → 1 (strict reverse topological order)
+
+
+B.5 Network Port Map (Normative)
+┌──────────┬──────────────┬───────────────────────────────────────────────────────┐
+│  Port    │  Protocol    │  Purpose &amp; Capability                                  │
+├──────────┼──────────────┼───────────────────────────────────────────────────────┤
+│  47200   │  HTTPS/REST  │  REST API — OrchestratorCapability (inbound)           │
+│  47201   │  gRPC/mTLS   │  gRPC API — OrchestratorCapability (inbound)           │
+│  47202   │  WSS         │  WebSocket — OrchestratorCapability + WebUICapability  │
+│  47203   │  HTTPS/MCP   │  MCP Server 2025-11-25 — PluginCapability (inbound)    │
+│   9090   │  HTTP        │  Prometheus metrics — ObservabilityCapability          │
+│   4222   │  NATS TCP    │  NATS.io message bus — MessagingCapability             │
+│   5672   │  AMQP        │  RabbitMQ (optional) — MessagingCapability             │
+│   4317   │  gRPC/OTLP   │  OpenTelemetry collector — ObservabilityCapability     │
+│   7687   │  Bolt        │  Neo4j graph DB — GraphRAGCapability (outbound)        │
+│  11434   │  HTTP        │  Ollama LLM server (outbound) — LLMRouterCapability    │
+└──────────┴──────────────┴───────────────────────────────────────────────────────┘
+All inbound ports on 47200–47203 require TLS. mTLS enforced for server-to-server.
+All REST and WebSocket endpoints require JWT authentication.
+All gRPC calls require mutual TLS.
+
+
+B.6 Zero-Trust Security Flow Diagram
+Inbound Request
+      │
+      ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  TRANSPORT LAYER                                                 │
+│  mTLS verification (RESTCommunicationPort / GRPCCommunicationPort)│
+└──────────────────────────────┬──────────────────────────────────┘
+                               │  PASS
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  AUTHENTICATION LAYER (SecurityCapability)                       │
+│  JWT bearer token verification (RS256)                           │
+│  TOTP verification (SUPERUSER / ADMIN roles only)               │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │  PASS
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  AUTHORIZATION LAYER (SecurityCapability)                        │
+│  RBAC deny-by-default: permission ∈ allowlist? → ALLOW : DENY  │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │  ALLOW
+                               ▼
+                    OctopussyMessage created
+                    (HMAC-SHA256 signed, frozen)
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  MESSAGE LAYER (OctopussyAgent._message_loop())                  │
+│  verify_signature()  → DROP + AUDIT if invalid                  │
+│  is_expired()        → DROP + AUDIT if TTL exceeded             │
+│  scan_prompt()       → BLOCK + AUDIT if injection detected      │
+│  check_budget()      → BLOCK + AUDIT if budget exhausted        │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │  PASS ALL
+                               ▼
+                    process_task() executes
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  TOOL EXECUTION LAYER (ToolRegistryCapability + SandboxCapability│
+│  tool_id ∈ allowed_tools? → ALLOW : ToolPermissionError         │
+│  SandboxCapability isolates execution (Bulkhead pattern)         │
+│  Network: explicit allowlist only (default: disabled)            │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │  PASS
+                               ▼
+                    Agent output produced
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  OUTPUT GUARDRAIL LAYER (SecurityCapability)                     │
+│  validate_output(output, policy) → BLOCK + AUDIT if violated    │
+│  HMAC-SHA256 signature applied to response OctopussyMessage     │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │  PASS
+                               ▼
+                    Response delivered to caller
+                    Audit entry written (append-only JSONL)
+
+
+
+
+These addendums are normative supplements to Octopussy Architecture Specification &amp; Implementation Skeleton v4.0.1. They carry the same authority as the base document. All content is fully consistent with CCA 0.2 by Michael Stal, the six-phase Capability lifecycle, and the zero-trust security model specified in the base document.
 
 
 

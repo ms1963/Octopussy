@@ -10,10 +10,11 @@ Date: 2026-03-17
 
 TABLE OF CONTENTS
 
-Vision & Positioning
-Architectural Foundations
-System-Level CCA Capability Map
-Core Capabilities — Detailed Specification
+1. Vision & Positioning
+2. Architectural Foundations
+3. System-Level CCA Capability Map
+
+4. Core Capabilities — Detailed Specification
 4.0 CCA Foundation Types
 4.1 OrchestratorCapability
 4.2 AgentFactoryCapability
@@ -42,26 +43,29 @@ Core Capabilities — Detailed Specification
 4.25 ConfigurationCapability
 
 
-Built-in Tool Catalogue
-Actor Model & Agent Architecture
-Multi-Agent Team Patterns
-LLM/VLM Port Architecture
-Plugin Architecture
-Security Architecture
-Quality Attribute Realization
-Design Patterns Reference Matrix
-Configuration Reference
-Capability Lifecycle & Registry
-Project Directory Structure
+5. Built-in Tool Catalogue
+6. Actor Model & Agent Architecture
+7. Multi-Agent Team Patterns
+8. LLM/VLM Port Architecture
+9. Plugin Architecture
+10.Security Architecture
+11.Quality Attribute Realization
+12.Design Patterns Reference Matrix
+13.Configuration Reference
+14.Capability Lifecycle & Registry
+15. Project Directory Structure
 Appendix A: Open Source Stack
 ADDENDUM A — END-TO-END WORKFLOW CATALOGUE
 ADDENDUM B — SYSTEM ARCHITECTURE DIAGRAM
 
 
 1. VISION & POSITIONING
+
 1.1 What Is Octopussy?
+
 Octopussy is a production-grade, Python-native Agentic AI platform built entirely on Capability-Centric Architecture (CCA) 0.2 by Michael Stal. It provides a complete, pluggable, zero-trust runtime for deploying, orchestrating, and operating autonomous AI agents — from a single Raspberry Pi to a Kubernetes cluster.
 Every functional unit of Octopussy is a Capability with a strict three-layer Nucleus (Essence / Realization / Adaptation), a formal Contract (Provisions / Requirements / Protocols), a Capability Instance managed by the OctopussyCapabilityLifecycleManager (OCLM), and an Evolution Envelope. No exceptions.
+
 1.2 Design Principles
 
 
@@ -184,7 +188,9 @@ Full plugin architecture, runtime hot-loading
 
 
 2. ARCHITECTURAL FOUNDATIONS
+
 2.1 Capability-Centric Architecture (CCA 0.2) Application
+
 Every functional unit of Octopussy is a Capability structured according to CCA 0.2 by Michael Stal. The following CCA elements are applied throughout:
 CCA 0.2 Terminology Clarification (Normative)
 
@@ -250,6 +256,7 @@ instantiate → initialize() → inject_dependency() → start()
 stop() → cleanup()
 
 Shutdown proceeds in strict reverse topological order.
+
 2.2 Design Patterns Applied
 
 
@@ -398,8 +405,11 @@ SecretsCapability
 Shutdown proceeds in strict reverse order.
 
 4. CORE CAPABILITIES — DETAILED SPECIFICATION
+
 4.0 CCA Foundation Types
+
 4.0.1 Core Domain Types (Constants & Enums)
+
 # octopussy/core/enums.py
 
 from __future__ import annotations
@@ -466,6 +476,7 @@ class TeamPattern(StrEnum):
     TREE                = "TREE"
 
 4.0.2 OctopussyMessage (Immutable Inter-Agent Message)
+
 # octopussy/core/message.py
 
 from __future__ import annotations
@@ -544,6 +555,7 @@ class OctopussyMessage:
         return time.time() > self.timestamp + self.ttl_sec
 
 4.0.3 Core Port Interfaces
+
 # octopussy/core/ports/ports.py
 
 from __future__ import annotations
@@ -633,6 +645,7 @@ class SecretsPort(ABC):
     async def delete_secret(self, name: str) -> None: ...
 
 4.0.4 LLM Ports & VLM Ports (Complete — All Providers)
+
 # octopussy/core/ports/llm_ports.py
 
 from __future__ import annotations
@@ -820,6 +833,7 @@ class AzureOpenAIVLMPort(VLMPort):
     async def complete(self, request: LLMRequest, image_bytes: bytes) -> LLMCompletion: ...
 
 4.0.5 RAG Ports (Complete — All Vector DB Backends)
+
 # octopussy/core/ports/rag_ports.py
 
 from __future__ import annotations
@@ -879,6 +893,7 @@ class VectorDBPluginRAGPort(RAGPort):
     async def delete_collection(self, collection_name: str) -> None: ...
 
 4.0.6 Graph Ports (Complete — All Graph DB Backends)
+
 # octopussy/core/ports/graph_ports.py
 
 from __future__ import annotations
@@ -939,6 +954,7 @@ class GraphDBPluginGraphPort(GraphPort):
     async def delete_graph(self, graph_name: str) -> None: ...
 
 4.0.7 Communication Ports (Complete — All Transport Protocols)
+
 # octopussy/core/ports/communication_ports.py
 
 from __future__ import annotations
@@ -1025,6 +1041,7 @@ class InMemoryBusCommunicationPort(CommunicationPort):
     async def disconnect(self) -> None: ...
 
 4.0.8 DLQ Port
+
 # octopussy/core/ports/dlq_port.py
 
 from __future__ import annotations
@@ -1043,6 +1060,7 @@ class DLQPort(ABC):
     async def purge(self) -> int: ...
 
 4.0.9 Agent Spec Models
+
 # octopussy/core/models/agent_spec.py
 
 from __future__ import annotations
@@ -1112,6 +1130,7 @@ class AgentSpec:
 
 
 4.1 OrchestratorCapability
+
 Purpose: Top-level orchestrator. Accepts tasks from REST, gRPC, and WebSocket. Dispatches tasks to agents and teams. Aggregates results. Provides system status.
 OrchestratorCapability
 │
@@ -1209,6 +1228,7 @@ MIGRATION_GUIDE        = "docs/migration/orchestrator_4_0.md"
 
 
 4.2 AgentFactoryCapability
+
 Purpose: Creates agent instances from Markdown configuration files. Validates agent specs. Caches parsed specs. Wires all required ports.
 AgentFactoryCapability
 │
@@ -1286,6 +1306,7 @@ MIGRATION_GUIDE        = "docs/migration/agent_factory_4_0.md"
 
 
 4.3 ActorCapability (OctopussyAgent)
+
 Purpose: Provides the abstract base for all agent actors. Manages agent lifecycle, message dispatch, LLM/VLM calls, tool execution, memory, RAG, and reflection.
 ActorCapability
 │
@@ -1594,6 +1615,7 @@ MIGRATION_GUIDE        = "docs/migration/actor_4_0.md"
 
 
 4.4 TeamCapability
+
 Purpose: Manages multi-agent teams. Supports four team patterns: Pipeline, Coordinator/Worker, Mesh+Blackboard, Tree.
 TeamCapability
 │
@@ -1669,6 +1691,7 @@ MIGRATION_GUIDE        = "docs/migration/team_4_0.md"
 
 
 4.5 LLMRouterCapability
+
 Purpose: Routes LLM/VLM requests to the optimal provider based on routing strategy (COST, QUALITY, BALANCED, LOCAL, CLOUD). Maintains a hot-reloadable routing table. Manages GPU backend selection. Delivers all LLMPort and VLMPort instances. Retrieves API tokens and credentials from SecretsCapability. Supports user-managed credentials for different LLM providers.
 LLMRouterCapability
 │
@@ -1914,6 +1937,7 @@ MIGRATION_GUIDE        = "docs/migration/llm_router_4_0.md"
 
 
 4.6 MemoryCapability
+
 Purpose: Provides persistent, per-agent key-value memory with semantic search. Isolates memory per agent.
 MemoryCapability
 │
@@ -1986,6 +2010,7 @@ MIGRATION_GUIDE        = "docs/migration/memory_4_0.md"
 
 
 4.7 RAGCapability & GraphRAGCapability
+
 Purpose: RAGCapability provides vector-based retrieval over document collections. GraphRAGCapability handles knowledge structured as a graph.
 RAGCapability
 │
@@ -2134,6 +2159,7 @@ MIGRATION_GUIDE        = "docs/migration/graph_rag_4_0.md"
 
 
 4.8 ToolRegistryCapability
+
 Purpose: Manages the registry of all built-in and plugin tools. Enforces tool permissions. Provides tool execution via MCP 2025-11-25.
 ToolRegistryCapability
 │
@@ -2205,6 +2231,7 @@ MIGRATION_GUIDE        = "docs/migration/tool_registry_4_0.md"
 
 
 4.9 PluginCapability
+
 Purpose: Manages the plugin lifecycle: loading, validation, registration, hot-reload, and unloading. Supports 9 plugin types. Hosts the OctopussyMCPServer (MCP 2025-11-25).
 PluginCapability
 │
@@ -2281,6 +2308,7 @@ MIGRATION_GUIDE        = "docs/migration/plugin_4_0.md"
 
 
 4.10 MessagingCapability
+
 Purpose: Provides the internal message bus. Supports NATS.io (default), RabbitMQ, and in-memory bus. Manages the Dead Letter Queue (DLQ).
 MessagingCapability
 │
@@ -2356,6 +2384,7 @@ MIGRATION_GUIDE        = "docs/migration/messaging_4_0.md"
 
 
 4.11 CommunicationAdapterCapability
+
 Purpose: Manages external communication channel adapters (Telegram, WhatsApp, Signal, Messenger, Slack, etc.). Bridges external channels to the internal OctopussyMessage bus.
 CommunicationAdapterCapability
 │
@@ -2423,6 +2452,7 @@ MIGRATION_GUIDE        = "docs/migration/comm_adapter_4_0.md"
 
 
 4.12 SecurityCapability
+
 Purpose: Enforces zero-trust security across the entire platform. Provides authentication, authorization, prompt injection scanning, output guardrails, and user registration/validation.
 SecurityCapability
 │
@@ -2517,6 +2547,7 @@ MIGRATION_GUIDE        = "docs/migration/security_4_0.md"
 
 
 4.13 SecretsCapability
+
 Purpose: Provides secure storage, retrieval, and rotation of secrets (API tokens, credentials, passwords). Supports local encrypted file store and HashiCorp Vault. Provides the secure mechanism for users to specify credentials for different LLM providers.
 SecretsCapability
 │
@@ -2592,6 +2623,7 @@ MIGRATION_GUIDE        = "docs/migration/secrets_4_0.md"
 
 
 4.14 SchedulerCapability
+
 Purpose: Provides cron-based scheduling for ScheduledTaskDaemon agents. Triggers agent execution on configured cron expressions.
 SchedulerCapability
 │
@@ -2653,6 +2685,7 @@ MIGRATION_GUIDE        = "docs/migration/scheduler_4_0.md"
 
 
 4.15 ObservabilityCapability (Sidecar)
+
 Purpose: Provides distributed tracing, structured logging, metrics, and immutable audit logging via OpenTelemetry. Runs as a Sidecar — starts before all other Capabilities and never blocks them.
 ObservabilityCapability  [Sidecar]
 │
@@ -2722,6 +2755,7 @@ MIGRATION_GUIDE        = "docs/migration/observability_4_0.md"
 
 
 4.16 PromptEngineCapability
+
 Purpose: Manages the prompt catalog. Renders prompt templates with agent context. Validates rendered prompts before LLM submission.
 PromptEngineCapability
 │
@@ -2784,6 +2818,7 @@ MIGRATION_GUIDE        = "docs/migration/prompt_engine_4_0.md"
 
 
 4.17 UserSessionCapability
+
 Purpose: Manages user sessions for REST API and WebUI interactions. Provides session creation, validation, and expiry.
 UserSessionCapability
 │
@@ -2851,6 +2886,7 @@ MIGRATION_GUIDE        = "docs/migration/user_session_4_0.md"
 
 
 4.18 WebUICapability
+
 Purpose: Provides the Octopussy web dashboard. Serves static assets and real-time updates via WebSocket. Includes a Credentials Manager for users to securely manage LLM provider credentials.
 WebUICapability
 │
@@ -2914,6 +2950,7 @@ MIGRATION_GUIDE        = "docs/migration/webui_4_0.md"
 
 
 4.19 CLICapability
+
 Purpose: Provides the Octopussy command-line interface. Supports system management, agent management, plugin management, and credential management.
 CLICapability
 │
@@ -2995,6 +3032,7 @@ MIGRATION_GUIDE        = "docs/migration/cli_4_0.md"
 
 
 4.20 SpeechCapability
+
 Purpose: Provides speech-to-text (STT) and text-to-speech (TTS) for voice-enabled agents and communication channels.
 SpeechCapability
 │
@@ -3051,6 +3089,7 @@ MIGRATION_GUIDE        = "docs/migration/speech_4_0.md"
 
 
 4.21 SandboxCapability
+
 Purpose: Provides isolated execution environments for tool execution. Implements the Bulkhead pattern to prevent cascade failures.
 SandboxCapability
 │
@@ -3147,6 +3186,7 @@ MIGRATION_GUIDE        = "docs/migration/sandbox_4_0.md"
 
 
 4.22 TokenBudgetCapability
+
 Purpose: Enforces per-agent token budgets across multiple time periods. Prevents runaway token consumption and cost overruns.
 TokenBudgetCapability
 │
@@ -3213,6 +3253,7 @@ MIGRATION_GUIDE        = "docs/migration/token_budget_4_0.md"
 
 
 4.23 CritiqueCapability
+
 Purpose: Implements the Critique-and-Revise pattern. Reviews agent outputs for quality, accuracy, and policy compliance before delivery.
 CritiqueCapability
 │
@@ -3270,6 +3311,7 @@ MIGRATION_GUIDE        = "docs/migration/critique_4_0.md"
 
 
 4.24 AgentLifecycleManagerCapability
+
 Purpose: Manages the complete lifecycle of all agents. Maintains the authoritative registry of agent states. Enforces state machine transitions.
 AgentLifecycleManagerCapability
 │
@@ -3345,6 +3387,7 @@ MIGRATION_GUIDE        = "docs/migration/agent_lifecycle_4_0.md"
 
 
 4.25 ConfigurationCapability
+
 Purpose: Loads, validates, and provides system-wide configuration. Watches configuration files for changes and notifies dependent Capabilities.
 ConfigurationCapability
 │
@@ -3406,6 +3449,7 @@ MIGRATION_GUIDE        = "docs/migration/configuration_4_0.md"
 
 
 5. BUILT-IN TOOL CATALOGUE
+
 All built-in tools are registered in ToolRegistryCapability during the start() phase. Each tool is registered with:
 
 A unique tool_id
@@ -3416,6 +3460,7 @@ A network requirement flag
 The plugin module path
 
 Custom tools can be added via TOOL_PLUGIN plugins without modifying core code. All tool calls use MCP 2025-11-25 Streamable HTTP (exclusive mechanism).
+
 5.1 Tool Categories
 
 
@@ -3454,6 +3499,7 @@ code_execute
 
 
 5.2 Built-in Tool Specifications
+
 5.2.1 web_search
 
 Tool ID: web_search
@@ -3784,6 +3830,7 @@ Permissions: Requires calendar_write in allowed_tools. Calendar credentials stor
 Sandbox: Yes — network access to calendar server only.
 
 5.3 Tool Permission Configuration Example
+
 ## Tools
 
 allowed_tools:
@@ -3800,6 +3847,7 @@ forbidden_tools:
   - calendar_write
 
 5.4 Tool Registration at Startup
+
 All built-in tools are registered in ToolRegistryCapability during the start() phase. Each tool is registered with:
 
 A unique tool_id
@@ -3812,6 +3860,7 @@ The plugin module path
 Custom tools can be added via TOOL_PLUGIN plugins without modifying core code.
 
 6. ACTOR MODEL & AGENT ARCHITECTURE
+
 OctopussyAgent (ABC)
 │
 ├── StatelessOneShot          — executes once, returns result, terminates
@@ -3891,6 +3940,7 @@ max_loop_iterations: 50
 
 
 7. MULTI-AGENT TEAM PATTERNS
+
 Octopussy supports four team patterns:
 
 
@@ -3919,7 +3969,9 @@ Root agent delegates to child agents recursively
 All inter-agent messages within a team are signed OctopussyMessage instances routed via MessagingCapability.
 
 8. LLM/VLM PORT ARCHITECTURE
+
 8.1 Routing Flow
+
 AgentSpec.intelligence
 │
 ▼
@@ -4014,6 +4066,7 @@ GPT-4o, GPT-4 via Azure endpoint
 
 
 8.3 Credential Management for LLM Providers
+
 Users must manage credentials for different LLM providers via the SecretStore:
 # CLI — set credentials for cloud LLM providers
 octopussy secrets set openai_api_key      "sk-..."
@@ -4028,6 +4081,7 @@ octopussy secrets set azure_openai_endpoint "https://..."
 # Authenticated users can set/update/delete credentials for any provider.
 
 All credentials are stored encrypted (AES-256-GCM) in the SecretStore. LLMRouterCapability retrieves them at call time via SecretsCapability. Credentials are never stored in configuration files or environment variables.
+
 8.4 GPU Backend Selection
 
 
@@ -4064,6 +4118,7 @@ CPU
 GPU backend is detected automatically at startup by GPUDetector in LLMRouterCapability. Local inference engines (Ollama, vLLM, SGLang, MLX) leverage the detected backend transparently. Octopussy does not need to manage GPU hardware directly — it calls the inference engine's REST API.
 
 9. PLUGIN ARCHITECTURE
+
 9.1 Plugin Types
 
 
@@ -4120,6 +4175,7 @@ Adds prompt patterns
 
 
 9.2 Custom Communication Adapter Example (Slack)
+
 octopussy/plugins/comm_adapters/slack/
 ├── __init__.py
 ├── slack_adapter.py
@@ -4134,6 +4190,7 @@ octopussy/plugins/comm_adapters/slack/
 }
 
 9.3 Custom LLM Adapter Plugin Example
+
 octopussy/plugins/llm_adapters/custom_llm/
 ├── __init__.py
 ├── custom_llm_port.py
@@ -4149,7 +4206,9 @@ octopussy/plugins/llm_adapters/custom_llm/
 
 
 10. SECURITY ARCHITECTURE
+
 10.1 Zero-Trust Enforcement Chain
+
 Every interaction passes through the full security chain:
 Inbound request (REST/gRPC/WebSocket/Channel)
 │
@@ -4178,10 +4237,15 @@ Agent output
 └── HMAC-SHA256 signature on response (OctopussyMessage.create())
 
 10.2 HMAC Signing
+
 Every OctopussyMessage carries a mandatory HMAC-SHA256 signature (bytes, never Optional[bytes]). Comparison uses hmac.compare_digest() (constant-time, prevents timing attacks). Key rotation is supported via SecretsCapability.rotate_secret().
+
 10.3 Sandbox Isolation (Bulkhead Pattern)
+
 Each agent gets its own sandbox. Tool execution is isolated per agent. A misbehaving tool in Agent A cannot affect Agent B or the host system.
+
 10.4 User Registration and Authentication
+
 Users must be registered with Octopussy before accessing any resource:
 
 Registration: SecurityCapability.register_user(username, password, role) — stores bcrypt-hashed credentials in RBACPolicyStore.
@@ -4190,6 +4254,7 @@ Session: UserSessionCapability.create_session(user_id, role) — creates a JWT-s
 Authorization: SecurityCapability.authorize(user_id, resource, action) — RBAC deny-by-default check on every request.
 
 10.5 Credential Management Security
+
 All LLM provider API tokens and credentials are stored via SecretsCapability (AES-256-GCM encrypted at rest). The flow is:
 
 User authenticates with Octopussy (JWT).
@@ -4433,6 +4498,7 @@ Non-blocking observability
 
 
 13. CONFIGURATION REFERENCE
+
 # /etc/octopussy/config/octopussy.yaml
 
 version: "4.0"
@@ -4505,7 +4571,9 @@ tools:
 
 
 14. CAPABILITY LIFECYCLE & REGISTRY
+
 14.1 CapabilityFactory
+
 # octopussy/core/capability_factory.py
 
 from __future__ import annotations
@@ -4531,6 +4599,7 @@ class CapabilityFactory:
         return capability_class(**kwargs)
 
 14.2 OctopussyCapabilityRegistry
+
 # octopussy/core/registry.py
 
 from __future__ import annotations
@@ -4590,6 +4659,7 @@ class OctopussyCapabilityRegistry:
         return order
 
 14.3 Capability Registration
+
 # octopussy/capabilities/registration.py
 
 from octopussy.core.registry import OctopussyCapabilityRegistry
@@ -4756,6 +4826,7 @@ def register_all_capabilities(registry: OctopussyCapabilityRegistry) -> None:
 
 
 15. PROJECT DIRECTORY STRUCTURE
+
 octopussy/
 ├── pyproject.toml
 ├── README.md
@@ -5337,11 +5408,15 @@ File change detection
 
 
 ADDENDUM A — END-TO-END WORKFLOW CATALOGUE
+
 Addendum Status: Normative
+
 Addendum Version: 1.0 (for Octopussy 4.0.1)
+
 This addendum specifies all primary end-to-end operational workflows of the Octopussy platform. Each workflow is described as an ordered sequence of steps, identifying the Capabilities, Ports, and message types involved at each stage. All workflows are fully consistent with CCA 0.2, the six-phase Capability lifecycle, the zero-trust security chain, and the async Actor model.
 
 A.1 Platform Startup Workflow
+
 Trigger: octopussy start (CLI) or asyncio.run(main()) (programmatic)
 Outcome: All 26 Capability Instances are running and ready to accept work.
 1.  main() invoked
@@ -5393,6 +5468,7 @@ Startup order is deterministic and reproducible across restarts.
 
 
 A.2 Agent Creation Workflow
+
 Trigger: OrchestratorCapability.dispatch_task() or AgentFactoryCapability.create_agent() called directly.
 Outcome: A fully initialized, running OctopussyAgent instance is registered and processing messages.
 1.  Caller invokes AgentFactoryCapability.create_agent(config_path)
@@ -5438,6 +5514,7 @@ Outcome: A fully initialized, running OctopussyAgent instance is registered and 
 
 
 A.3 Single-Agent Task Execution Workflow
+
 Trigger: An OctopussyMessage of type TASK is enqueued into an agent's inQ.
 Outcome: The agent produces a result and enqueues a RESULT message into outQ.
 1.  Caller creates message:
@@ -5503,6 +5580,7 @@ Outcome: The agent produces a result and enqueues a RESULT message into outQ.
 
 
 A.4 Multi-Agent Team Task Workflow — Coordinator/Worker Pattern
+
 Trigger: TeamCapability.submit_team_task(team_id, task) called.
 Outcome: Coordinator synthesizes worker results and delivers a unified team result.
 1.  TeamCapability.submit_team_task(team_id, task, priority)
@@ -5540,6 +5618,7 @@ Outcome: Coordinator synthesizes worker results and delivers a unified team resu
 
 
 A.5 Multi-Agent Team Task Workflow — Pipeline Pattern
+
 Trigger: TeamCapability.submit_team_task(team_id, task) on a Pipeline team.
 Outcome: Task flows sequentially through N agents; final agent's output is the result.
 1.  TeamCapability.submit_team_task(team_id, task, priority)
@@ -5567,6 +5646,7 @@ Outcome: Task flows sequentially through N agents; final agent's output is the r
 
 
 A.6 Multi-Agent Team Task Workflow — Mesh + Blackboard Pattern
+
 Trigger: TeamCapability.submit_team_task(team_id, task) on a Mesh+Blackboard team.
 Outcome: Agents collaborate peer-to-peer via a shared Redis-backed Blackboard; consensus result emerges.
 1.  TeamCapability.submit_team_task(team_id, task, priority)
@@ -5596,6 +5676,7 @@ Outcome: Agents collaborate peer-to-peer via a shared Redis-backed Blackboard; c
 
 
 A.7 Tool Execution Workflow (MCP)
+
 Trigger: Agent calls a tool inside process_task().
 Outcome: Tool result returned to agent; sandbox enforced throughout.
 1.  Agent invokes ToolRegistryCapability.execute_tool(tool_id, input, agent_context)
@@ -5639,6 +5720,7 @@ Outcome: Tool result returned to agent; sandbox enforced throughout.
 
 
 A.8 Error Handling & Dead Letter Queue (DLQ) Workflow
+
 Trigger: Message delivery fails after dlq.max_retries attempts, or an agent raises an unhandled exception.
 Outcome: Message is persisted to the DLQ; alert emitted; agent transitions to ERROR state if applicable.
 SCENARIO A — Message delivery failure:
@@ -5690,6 +5772,7 @@ SCENARIO B — Agent unhandled exception during process_task():
 
 
 A.9 Plugin Hot-Reload Workflow
+
 Trigger: octopussy plugin reload <plugin_id> (CLI) or PluginCapability.hot_reload_plugin(plugin_id) (API).
 Outcome: New plugin version is live without platform restart; zero downtime.
 1.  PluginCapability.hot_reload_plugin(plugin_id) called
@@ -5727,6 +5810,7 @@ Outcome: New plugin version is live without platform restart; zero downtime.
 
 
 A.10 Scheduled Task Execution Workflow
+
 Trigger: SchedulerCapability fires a cron trigger for a ScheduledTaskDaemon agent.
 Outcome: Agent executes its scheduled task and returns to sleep until the next cron tick.
 1.  SchedulerCapability.CronEngine evaluates all registered cron expressions
@@ -5763,6 +5847,7 @@ Outcome: Agent executes its scheduled task and returns to sleep until the next c
 
 
 A.11 MCP Client Tool Call Workflow (Agent → External MCP Server)
+
 Trigger: Agent calls an external MCP server tool inside process_task().
 Outcome: External tool result returned to agent via MCP 2025-11-25 Streamable HTTP.
 1.  Agent's process_task() invokes MCPClientAdapter.call_tool(server_url, tool_name, args)
@@ -5799,6 +5884,7 @@ Outcome: External tool result returned to agent via MCP 2025-11-25 Streamable HT
 
 
 A.12 Platform Shutdown Workflow
+
 Trigger: SIGINT or SIGTERM received by the platform process.
 Outcome: All Capabilities stopped gracefully in strict reverse topological order; no message loss.
 1.  Signal handler sets shutdown_event
@@ -5836,6 +5922,7 @@ Outcome: All Capabilities stopped gracefully in strict reverse topological order
 
 
 A.13 Inbound Channel Message Workflow (External User → Agent)
+
 Trigger: A user sends a message on an external channel (Telegram, Slack, WhatsApp, etc.).
 Outcome: Agent processes the message and delivers a response back to the user on the same channel.
 1.  External channel delivers event to CommunicationAdapterCapability:
@@ -5878,8 +5965,11 @@ Outcome: Agent processes the message and delivers a response back to the user on
 
 
 ADDENDUM B — SYSTEM ARCHITECTURE DIAGRAM
+
 Addendum Status: Normative
+
 Addendum Version: 1.0 (for Octopussy 4.0.1)
+
 This addendum provides the authoritative system-level architecture diagram for Octopussy v4.0.1. The diagram is presented in structured ASCII art, organized by architectural layer. All 26 Capabilities, all communication ports, all external integrations, and all deployment boundaries are represented. The diagram is consistent with the CCA 0.2 Capability Map (Chapter 3) and all Capability specifications (Chapter 4).
 
 B.1 Legend

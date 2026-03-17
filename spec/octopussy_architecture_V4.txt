@@ -5892,16 +5892,17 @@ B.1 Legend
 ╚═════════════════════╝
 
 ━━━━━━━━━━━━━━━━━━━━━  Synchronous call / dependency injection
-─ ─ ─ ─ ─ ─ ─ ─ ─ ─  Async message (OctopussyMessage via MessagingCapability)
-══════════════════════  External protocol boundary (REST/gRPC/MCP/WSS/NATS)
+─ ─ ─ ─ ─ ─ ─ ─ ─ ─    Async message (OctopussyMessage via MessagingCapability)
+══════════════════════ External protocol boundary (REST/gRPC/MCP/WSS/NATS)
 [Port]                 CommunicationPort or domain Port interface
 [DI]                   Dependency Injection (inject_dependency())
 [Sidecar]              Runs independently; starts before all others
 
 
 B.2 Full System Architecture Diagram
+
 ╔══════════════════════════════════════════════════════════════════════════════════╗
-║                         EXTERNAL CLIENTS & CHANNELS                           ║
+║                         EXTERNAL CLIENTS & CHANNELS                               ║
 ║                                                                                   ║
 ║  ╔══════════╗  ╔══════════╗  ╔══════════╗  ╔══════════╗   ╔════════════════════╗  ║
 ║  ║ REST API ║  ║ gRPC API ║  ║  WebUI   ║  ║   CLI    ║   ║ Telegram/Slack/    ║  ║
@@ -5912,80 +5913,80 @@ B.2 Full System Architecture Diagram
 ╚═══════╪═════════════╪═════════════╪══════════════╪═══════════════════╪════════════╝
         │             │             │              │                   │
 ┌───────▼─────────────▼─────────────▼──────────────▼───────────────────▼────────────┐
-│                         OCTOPUSSY PLATFORM BOUNDARY                               │
-│                                                                                   │
-│  ┌──────────────────────────────────────────────────────────────────────────────┐ │
-│  │  [Sidecar]  ObservabilityCapability                                          │ │
-│  │  TracingEngine │ LoggingEngine │ MetricsEngine │ AuditEngine                 │ │
-│  │  OTLPExporter (:4317) │ PrometheusExporter (:9090)                           │ │
-│  │  ObservabilityPort ──[DI]──► injected into ALL 26 Capabilities               │ │
-│  └──────────────────────────────────────────────────────────────────────────────┘ │
+│                         OCTOPUSSY PLATFORM BOUNDARY                                │
+│                                                                                    │
+│  ┌──────────────────────────────────────────────────────────────────────────────┐  │
+│  │  [Sidecar]  ObservabilityCapability                                          │  │
+│  │  TracingEngine │ LoggingEngine │ MetricsEngine │ AuditEngine                 │  │
+│  │  OTLPExporter (:4317) │ PrometheusExporter (:9090)                           │  │
+│  │  ObservabilityPort ──[DI]──► injected into ALL 26 Capabilities               │  │
+│  └──────────────────────────────────────────────────────────────────────────────┘  │
 │                                                                                    │
 │  ┌─────────────────────┐    ┌──────────────────────┐    ┌───────────────────────┐  │
-│  │ OrchestratorCapab.  │    │  WebUICapability      │    │  CLICapability        │  │
-│  │ TaskAnalyzer        │    │  DashboardController  │    │  CLICommandParser     │  │
-│  │ AgentSelector       │    │  FastAPIStaticServer  │    │  CLIDispatcher        │  │
-│  │ TaskDispatcher      │    │  [WSS :47202]         │    │  [stdin/stdout]       │  │
-│  │ ResultAggregator    │    └──────────┬────────────┘    └──────────┬────────────┘  │
-│  │ SystemMonitor       │               │                             │               │
-│  │ [REST :47200]       │               │                             │               │
-│  │ [gRPC :47201]       │               └─────────────────────────────┘               │
-│  │ [WSS  :47202]       │                           │                                 │
-│  └──────────┬──────────┘                           │                                 │
-│             │                                      ▼                                 │
-│             │                    ┌─────────────────────────────┐                     │
-│             │                    │  UserSessionCapability       │                     │
-│             │                    │  SessionStore (Redis/SQLite) │                     │
-│             │                    │  JWT (RS256), TTL: 8h        │                     │
-│             │                    └─────────────────────────────┘                     │
-│             │                                                                        │
-│  ┌──────────▼──────────────────────────────────────────────────────────────────┐    │
-│  │                        CORE ORCHESTRATION LAYER                              │    │
-│  │                                                                              │    │
-│  │  ┌───────────────────────┐      ┌──────────────────────────────────────┐    │    │
-│  │  │ AgentFactoryCapab.    │      │ AgentLifecycleManagerCapability       │    │    │
-│  │  │ AgentSpecBuilder      │      │ AgentStateMachine Registry            │    │    │
-│  │  │ AgentConfigValidator  │      │ Heartbeat Monitor                     │    │    │
-│  │  │ AgentInstantiator     │      │ CREATED→IDLE→PROCESSING→IDLE          │    │    │
-│  │  │ AgentSpecCache        │      │ →ERROR→STOPPING→STOPPED               │    │    │
-│  │  └──────────┬────────────┘      └──────────────────────────────────────┘    │    │
-│  │             │ creates                                                        │    │
-│  │             ▼                                                                │    │
-│  │  ┌──────────────────────────────────────────────────────────────────────┐   │    │
-│  │  │                    ACTOR LAYER (Agent Instances)                      │   │    │
-│  │  │                                                                       │   │    │
-│  │  │  ┌─────────────────────────────────────────────────────────────────┐ │   │    │
-│  │  │  │  OctopussyAgent (ABC)  [ActorCapability]                        │ │   │    │
-│  │  │  │                                                                  │ │   │    │
-│  │  │  │  inQ (asyncio.PriorityQueue)  ◄── OctopussyMessage (HMAC-signed)│ │   │    │
-│  │  │  │  CRITICAL=0 → HIGH=1 → NORMAL=2 → LOW=3                         │ │   │    │
-│  │  │  │                                                                  │ │   │    │
-│  │  │  │  _message_loop():                                                │ │   │    │
-│  │  │  │    verify_signature() → is_expired() → _handle_control()        │ │   │    │
-│  │  │  │    → scan_prompt() → check_budget() → process_task()            │ │   │    │
-│  │  │  │                                                                  │ │   │    │
-│  │  │  │  outQ (asyncio.PriorityQueue) ──► OctopussyMessage (HMAC-signed)│ │   │    │
-│  │  │  │  _outbound_dispatch_loop() ──► MessagingCapability              │ │   │    │
-│  │  │  │  _heartbeat_loop() ──► AgentLifecycleManagerCapability          │ │   │    │
-│  │  │  │                                                                  │ │   │    │
-│  │  │  │  Subtypes:  StatelessOneShot │ StatefulLoop │ ScheduledTaskDaemon│ │   │    │
-│  │  │  └─────────────────────────────────────────────────────────────────┘ │   │    │
-│  │  │                                                                       │   │    │
-│  │  │  ┌──────────────────────┐  ┌──────────────────────────────────────┐  │   │    │
-│  │  │  │  TeamCapability      │  │  SchedulerCapability                  │  │   │    │
-│  │  │  │  TeamOrchestrator    │  │  CronEngine (APScheduler ≥3.10)      │  │   │    │
-│  │  │  │  CoordWorkerEngine   │  │  TaskTrigger → MessagingCapability    │  │   │    │
-│  │  │  │  PipelineEngine      │  └──────────────────────────────────────┘  │   │    │
-│  │  │  │  MeshBlackboardEngine│                                             │   │    │
-│  │  │  │  TreeEngine          │                                             │   │    │
-│  │  │  │  BlackboardStore     │                                             │   │    │
-│  │  │  │  (Redis-backed)      │                                             │   │    │
-│  │  │  └──────────────────────┘                                             │   │    │
-│  │  └──────────────────────────────────────────────────────────────────────┘   │    │
+│  │ OrchestratorCapab.  │    │  WebUICapability      │   │  CLICapability        │  │
+│  │ TaskAnalyzer        │    │  DashboardController  │   │  CLICommandParser     │  │
+│  │ AgentSelector       │    │  FastAPIStaticServer  │   │  CLIDispatcher        │  │
+│  │ TaskDispatcher      │    │  [WSS :47202]         │   │  [stdin/stdout]       │  │
+│  │ ResultAggregator    │    └──────────┬────────────┘   └──────────┬────────────┘  │
+│  │ SystemMonitor       │               │                           │               │
+│  │ [REST :47200]       │               │                           │               │
+│  │ [gRPC :47201]       │               └───────────────────────────┘               │
+│  │ [WSS  :47202]       │                           │                               │
+│  └──────────┬──────────┘                           │                               │
+│             │                                      ▼                               │
+│             │                    ┌─────────────────────────────┐                   │
+│             │                    │  UserSessionCapability      │                   │
+│             │                    │  SessionStore (Redis/SQLite)│                   │
+│             │                    │  JWT (RS256), TTL: 8h       │                   │
+│             │                    └─────────────────────────────┘                   │
+│             │                                                                      │
+│  ┌──────────▼──────────────────────────────────────────────────────────────────┐   │
+│  │                        CORE ORCHESTRATION LAYER                              │  │
+│  │                                                                              │  │
+│  │  ┌───────────────────────┐      ┌──────────────────────────────────────┐     │  │
+│  │  │ AgentFactoryCapab.    │      │ AgentLifecycleManagerCapability      │     │  │
+│  │  │ AgentSpecBuilder      │      │ AgentStateMachine Registry           │     │  │
+│  │  │ AgentConfigValidator  │      │ Heartbeat Monitor                    │     │  │
+│  │  │ AgentInstantiator     │      │ CREATED→IDLE→PROCESSING→IDLE         │     │  │
+│  │  │ AgentSpecCache        │      │ →ERROR→STOPPING→STOPPED              │     │  │
+│  │  └──────────┬────────────┘      └──────────────────────────────────────┘     │  │
+│  │             │ creates                                                        │  │
+│  │             ▼                                                                │  │
+│  │  ┌──────────────────────────────────────────────────────────────────────┐    │  │
+│  │  │                    ACTOR LAYER (Agent Instances)                     │    │  │
+│  │  │                                                                      │    │  │
+│  │  │  ┌─────────────────────────────────────────────────────────────────┐ │    │  │
+│  │  │  │  OctopussyAgent (ABC)  [ActorCapability]                        │ │    │  │
+│  │  │  │                                                                 │ │    │  │
+│  │  │  │  inQ (asyncio.PriorityQueue)  ◄── OctopussyMessage (HMAC-signed)│ │    │  │
+│  │  │  │  CRITICAL=0 → HIGH=1 → NORMAL=2 → LOW=3                         │ │    │  │
+│  │  │  │                                                                 │ │    │  │
+│  │  │  │  _message_loop():                                               │ │    │  │
+│  │  │  │    verify_signature() → is_expired() → _handle_control()        │ │    │  │
+│  │  │  │    → scan_prompt() → check_budget() → process_task()            │ │    │  │
+│  │  │  │                                                                 │ │    │  │
+│  │  │  │  outQ (asyncio.PriorityQueue) ──► OctopussyMessage (HMAC-signed)│ │    │   │
+│  │  │  │  _outbound_dispatch_loop() ──► MessagingCapability              │ │    │    │
+│  │  │  │  _heartbeat_loop() ──► AgentLifecycleManagerCapability          │ │    │    │
+│  │  │  │                                                                 │ │    │    │
+│  │  │  │  Subtypes: StatelessOneShot │ StatefulLoop │ ScheduledTaskDaemon│ │    │    │
+│  │  │  └─────────────────────────────────────────────────────────────────┘ │    │    │
+│  │  │                                                                      │    │    │
+│  │  │  ┌──────────────────────┐  ┌──────────────────────────────────────┐  │    │    │
+│  │  │  │  TeamCapability      │  │  SchedulerCapability                 │  │    │    │
+│  │  │  │  TeamOrchestrator    │  │  CronEngine (APScheduler ≥3.10)      │  │    │    │
+│  │  │  │  CoordWorkerEngine   │  │  TaskTrigger → MessagingCapability   │  │    │    │
+│  │  │  │  PipelineEngine      │  └──────────────────────────────────────┘  │    │    │
+│  │  │  │  MeshBlackboardEngine│                                            │    │    │
+│  │  │  │  TreeEngine          │                                            │    │    │
+│  │  │  │  BlackboardStore     │                                            │    │    │
+│  │  │  │  (Redis-backed)      │                                            │    │    │
+│  │  │  └──────────────────────┘                                            │    │    │
+│  │  └──────────────────────────────────────────────────────────────────────┘    │    │
 │  └──────────────────────────────────────────────────────────────────────────────┘    │
 │                                                                                      │
 │  ┌───────────────────────────────────────────────────────────────────────────────┐   │
-│  │                       INTELLIGENCE & KNOWLEDGE LAYER                      │   │
+│  │                       INTELLIGENCE & KNOWLEDGE LAYER                          │   │
 │  │                                                                               │   │
 │  │  ┌──────────────────────────────────────────────────────────────────────┐     │   │
 │  │  │  LLMRouterCapability                                                 │     │   │
@@ -6011,15 +6012,15 @@ B.2 Full System Architecture Diagram
 │  │                            └──────────────────────┘                           │   │
 │  │                                                                               │   │
 │  │  ┌──────────────────────┐  ┌──────────────────────┐  ┌────────────────────┐   │   │
-│  │  │  PromptEngineCapab.  │  │  CritiqueCapability   │  │ TokenBudgetCapab.  │  │   │
-│  │  │  PromptCatalog       │  │  CritiqueEngine       │  │ BudgetStore        │  │   │
-│  │  │  TemplateEngine      │  │  RevisionEngine       │  │ (SQLite/Redis)     │  │   │
-│  │  │  PatternRegistry     │  │  (Critique-and-Revise)│  │ per-agent/period   │  │   │
+│  │  │  PromptEngineCapab.  │  │  CritiqueCapability  │  │ TokenBudgetCapab.  │   │   │
+│  │  │  PromptCatalog       │  │  CritiqueEngine      │  │ BudgetStore        │   │   │
+│  │  │  TemplateEngine      │  │  RevisionEngine      │  │ (SQLite/Redis)     │   │   │
+│  │  │  PatternRegistry     │  │  (Critique-&-Revise  │  │ per-agent/period   │   │   │
 │  │  └──────────────────────┘  └──────────────────────┘  └────────────────────┘   │   │
 │  └───────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                      │
 │  ┌───────────────────────────────────────────────────────────────────────────────┐   │
-│  │                      TOOL & EXECUTION LAYER                               │   │
+│  │                      TOOL & EXECUTION LAYER                                   │   │
 │  │                                                                               │   │
 │  │  ┌──────────────────────────────────────────────────────────────────────┐     │   │
 │  │  │  ToolRegistryCapability                                              │     │   │
@@ -6041,7 +6042,7 @@ B.2 Full System Architecture Diagram
 │  └───────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                      │
 │  ┌───────────────────────────────────────────────────────────────────────────────┐   │
-│  │                    MESSAGING & COMMUNICATION LAYER                        │   │
+│  │                    MESSAGING & COMMUNICATION LAYER                            │   │
 │  │                                                                               │   │
 │  │  ┌──────────────────────────────────────────────────────────────────────┐     │   │
 │  │  │  MessagingCapability                                                 │     │   │
@@ -6072,7 +6073,7 @@ B.2 Full System Architecture Diagram
 │  └───────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                      │
 │  ┌───────────────────────────────────────────────────────────────────────────────┐   │
-│  │                       SECURITY & SECRETS LAYER                            │   │
+│  │                       SECURITY & SECRETS LAYER                                │   │
 │  │                                                                               │   │
 │  │  ┌──────────────────────────────────────────────────────────────────────┐     │   │
 │  │  │  SecurityCapability                                                  │     │   │
@@ -6091,7 +6092,7 @@ B.2 Full System Architecture Diagram
 │  └───────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                      │
 │  ┌───────────────────────────────────────────────────────────────────────────────┐   │
-│  │                     CONFIGURATION & REGISTRY LAYER                        │   │
+│  │                     CONFIGURATION & REGISTRY LAYER                            │   │
 │  │                                                                               │   │
 │  │  ┌──────────────────────────────────┐  ┌──────────────────────────────────┐   │   │
 │  │  │  ConfigurationCapability         │  │  OctopussyCapabilityRegistry     │   │   │
@@ -6105,6 +6106,7 @@ B.2 Full System Architecture Diagram
 
 
 B.3 External Integrations Diagram
+
 OCTOPUSSY PLATFORM
         │
         │  [LLMRouterCapability — LLMPort / VLMPort]
@@ -6163,7 +6165,9 @@ OCTOPUSSY PLATFORM
 B.4 Capability Startup Order (Topological — Normative)
 The following is the deterministic, OCLM-computed startup order for all 26 Capabilities. Shutdown proceeds in strict reverse order (bottom to top).
 Startup Order (1 = first to start, 26 = last to start)
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
  1.  SecretsCapability                  (no dependencies)
  2.  ObservabilityCapability            [Sidecar] (depends: Secrets, Config)
      ↑ starts before all others after Secrets
@@ -6197,11 +6201,14 @@ Startup Order (1 = first to start, 26 = last to start)
                                                   Team, Messaging, Security, Obs)
 25.  CLICapability                      (depends: Orchestrator, Obs)
 26.  WebUICapability                    (depends: Orchestrator, Obs)
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 Shutdown: 26 → 1 (strict reverse topological order)
 
 
 B.5 Network Port Map (Normative)
+
 ┌──────────┬──────────────┬───────────────────────────────────────────────────────┐
 │  Port    │  Protocol    │  Purpose & Capability                             │
 ├──────────┼──────────────┼───────────────────────────────────────────────────────┤
@@ -6222,6 +6229,7 @@ All gRPC calls require mutual TLS.
 
 
 B.6 Zero-Trust Security Flow Diagram
+
 Inbound Request
       │
       ▼

@@ -1,0 +1,116 @@
+
+OCTOPUSSY REQUIREMENTS SPECIFICATION V4
+
+All requirements below are of equal relevance. A requirement is not less important if its more at the middle or end of the requirements list.
+
+Here are the requirements:
+- Octopussy must implement the following quality attributes
+    - efficiency (prio 1)
+    - security (prio 1)
+    - reliability (prio 2)
+    - scalability (prio 3)
+    - testability (prio 1)
+- Octopussy must be a superior competitor of OpenClaw. It must be much easier to install, manage, configure and use than OpenClaw. It provides more features than OpenClaw and implements OpenClaw features in a much more sound and efficient and secure way. For users and developers using Octopussy must be very intuitive with a flattened learning curve.
+- The Octopussy (host) runs on MacOS, Windows, Linux and SBCs like Raspberry Pi, Jetson Nano, … 
+- Octopussy is also available as 
+    - a Docker container and 
+    - a  Kubernetes installation
+- Most things/tasks should run fully automated. It must be incredibly easy to install, configure and run Octopussy even for non-IT users. It must be easy to create agents or agent teams. 
+- Users can easily configure agents with configuration files and pass the file path to Octopussy, so that Octopussy can create a new agent from these configuration files.
+- Users can also send a prompt to Octopussy asking the Octopussy host to create agents for a particular task or goal.  It is the responsibility of Octopussy to 
+    - decide whether to use a single agents or a team of agents.
+    - for teams to decide what collaboration pattern to use (for example, Coordinator/Worker)
+    - to provide agents (single agents or team agents) with exact, unambiguous instructions what they need to do.
+- The creation of the agent or team should be as automated as possible. Octopussy may ask the user for clarifications, though.
+- Octopussy should have a catalog of predefined prompt templates that address prompt enginering, especially for Agentic AI. Either users or Octopussy itself might use these patterns. This catalog might be subject to frequent changes and additions. Octopussy or users may enrich the pattern catalog.
+- Octopussy must have a sound, high quality, efficient architecture. It uses design and architecture pattern when possible and useful. It avoids anti patterns and pitfalls.
+- User must be able to remotely communicate with an Octopussy host. Octopussy requires authentication and authorization of each user. Users must register with a correct mail address. For easier login, ssh tokens are also supported. Only the super user is able to manage an Octopussy implementation without limitations. A super user can add users to the Octopussy system, give them more permissions. Users may also send mails, messages (WhatsApp, Messenger, Telegram, Signal) to the Octopussy system. Messages contain prompts for Octopussy that Octopussy may forward to a new agent. If already an agent is available for the user communication, Octopussy selects the existing one. Octopussy provides a Web interface. If the web interface is accessible from outside - users must configure the firewall -, then users can also access Octopussy local or remotely via the Web interface.  
+- Octopussy should be completely based on Open Source: libraries, frameworks, middleware. Of course external systems like the LLM being used, social media like Telegram or Signal or Whatsapp, external systems like Calendars, Mail applications, Office applications can be commercial.  
+- Octopussy supports local and remote LLMs. For local LLM support it is able to leverage GPU architectures such as Nvidia CUDA, AMD ROCm, Intel, Vulkan, Apple MPS/MLX. It may run on CPU as well, but only if no other GPU is found. If multiple GPUs are available, it uses all GPUs (except the user configures Octopussy otherwise)
+- Octopussy integrates monitoring and observability services to allow developers and users watch the current state of affairs. For this purpose, it uses the Sidecar pattern.
+- Agents can be in different states. Not all of the following states make sense. You may add, remove or rename states: 
+    - initializing: agent is initializing
+    - running: agent is started
+    - sleeping: agent is sleeping
+    - awakening: agent is waking up
+    - pausing: agent is pausing
+    - resuming: agent is resuming
+    - active: agent is busy working on a task (without communication)
+    - outbound: agent is communicating with a user, tool, LLM, other agent
+    - inbound: agent is receiving and processing  inbound information (for example, from Octopussy, from the user (human or programmatic), from an external application, from an LLM. 
+    - idle: agent is idle
+    - terminated: agent has been terminated
+- Each agent must monitor its own token usage (input and output tokens). An agent gets a configured limit of maximum input and output tokens it may consume per time period. This time period is also configurable (for example, by hour, by day, by week, by month). The user may specify maximum capactities for more than one time period such as maximum per hour and maximum per day.  Whenever one day, one hour, one months have passed the capacity is set to its maximum again. An agent is not permitted to exceed its maximum capacity. Whenever it reaches the maximum capacity, it must pause. It can sleep and be woken up by Octopussy component X. For this purpose, the user is asked whether the Agent can/should exceed its maximum by providing a new larger volume. If the user agrees, the capacities will be updated and the agents resumed. Otherwise, the agents goes to sleep and can be woken up when it retrieves the full capacity for the next time period. Users may specify maximum costs an agent can consume in addition to specifying the token usage. Users must configure Octopussy with the actual costs per 1 Million tokens (inbound and outbound) for the specific LLM model being used. 
+- Agents and tools are not allowed to run freely on the host. For security reasons, an agent on a host is always running in an OS-dependent sand box or in a container.
+- Octopussy is secure. It implements guardrails, secures all communication connections, secures static data and data in motion, only allows agents to do what they are allowed to do by configuration, using the principle of least privilege, prevents agents from changing or accessing Octopussy‘s internals. Octopussy scans each prompt for prompt injection and other kinds of injections. 
+- Octopussy provides a secrets store (maybe part of the OS or an open source component). No secrets like API keys, passwords, etc. must ever be stored in configuration files or in code. The secrets store allows to avoid such security risks.
+- Octopussy supports all kinds of remote cloud-based LLMs, especially from OpenAI, Antrophic, Google, AWS, Azure.
+- It supports different inference solutions for local LLMs like Ollama, LMStudio, vLLM, SG Lang, Huggingface, MLX. All inference solutions must provide the capability to provide an OpenAI compatible API. Users may add other inference engines at runtime. LLMs are accessible using an LLMPort object. VLMs are accessible via a VLMPort object. For each agent created Octopussy provides an LLMPort object or a VLMPort object or both that it passes to the agent using dependency injection
+- Octopussy supports VLMs and multi-modal language models.
+- While a user can define a specific LLM to be used by an agent, an agent does not see which LLM it actually uses. It just gets an LLMPort (or VLMPort) object passed by dependency injection that implements communication between the agent and the LLM in a transparent way. Thus, a change of the LLM model does not affect the agent.
+- Users may configure a fallback LLM (or VLM) that is used when the main LLM (or VLM) is not available. 
+- All agents follow the actor model. An actor/agent owns an inbound queue where other agents or components can send messages to the actor. This queue should be a priority queue. An actor extracts each incoming message (new prompt, or next prompt in a multi-turn conversation), does what is required to meet its goal) and sends the completion back to the sender of the message. Each message has a unique UUID. The corresponding completion includes exactly the same UUID so that there is a unique, unambigous correlation between request and result. There shall be no other way to access the functionality of an agent. In Octopussy, agents also have an outbound queue that they use for sending messages.
+- Each message/prompt sent to an agent, gets a unique UUID. When the agent sends back a completion to Octopussy, it must add this UUID. This approach helps Octopussy associate completions with prompts. 
+- The CLI and the WebUI create a user session for users. The chat history is then part of the agents memory. Each session is also associated with a session UUID to uniquely identify sessions. 
+- In addition, Octopussy assigns a unique UUID to all agents. It maintains a dictionary where Agent UUIDs are mapped to the actual agent implementation and their inbound queue reference.
+- All Agents must be derived from OctopussyAgent that defines common behavior, dependency injection, lifecycle events.
+- Iifecycle events are issued by Octopussy. They comprise:
+    - on_init: agent should initialize itself
+    - on_start: agent must start its work
+    - on_incoming message: a message from Octopussy host, an external application or another agent is received for example, an incoming mail, or a message a user sent using WhatsApp, … The agent should process the incoming message. If it is on duty it may defer the processing of the message to a later time. If a high priority message from the Octopussy host is received, agents must take care of this message before continuing their work. This message might be a signal to terminate after storing their state persistently.
+    - on_new_document: a new document is available for accessing it via RAG or GraphRAG.
+    - on_pause: agent should pause its work
+    - on_resume: agent should resume its work
+    - on_sleep: agents go sleep
+    - on wake_up: agents are woken up
+    - on_deinit: agent should store its state, free all resources
+    - on_stop: agent must terminate
+		When a stateful agent obtains an 				on_pause or on_resume, it should store its 		complete 	state to a persistent store and 		free all 			resources 		(only for 		on_sleep).   
+       	When it obtains an on_resume or 		
+		on_wakeup event, it should restore its 			state from the persistent store and obtain 		all necessary resources (on_wake_up 			only).
+- An agent which has finished its work, sents the completion (result) back to its parent. For single agents the parent is a component called Octopussy Orchestrator.  This is the same component that created the agent. Worker agents inform their coordinator. 
+- Each Agent may use its own LLM, so that they can access the most appropriate LLM for a task.
+- Octopussy supports different types of agents:
+    - daemon agents are background agent that work in the background. We might use a daemon to search for specific documents in the web, download them and process them for RAG access.
+    - stateless agents are agents that are idempotent. They do not have to manage state for their work. That implies, these agents get their states at thread start
+    - stateful agents maintain their own state. This implies, they must persist and restore state.
+    - agents might either conduct a task one time, send back their results and then they are done and can terminate or agents might provide a loop instead where they are continuously working in each loop iteration. In each iteration a separate task is executed. Of course, it could also be the same task in each iteration.
+    - It is better to provide stateless agents
+- Octopussy supports and uses  all memory types for Agentic AI: short-term memory, long-term memory, semantic memory and a cache.
+- Octopussy must be extremely easy to use, nonetheless secure
+- Agents can be created by configuration or by interacting with a central Octopussy component X (use an appropriate name instead of X). This component X is accessible programmatically via API, but also provides a CLI solution and a Web-based UI solution so that users can interact with Octopussy. Component X might have replicas for scalability.  
+- This component X can create agents and provides them with a proper, smart, sophisticated, efficient  prompt at start. If a problem is too complex to be solved by a single agent, the Octopussy component X can create and use multi-agent architectures called teams such as Pipeline, Coordinator/Worker or Agent Mesh with Blackboard. In this case component X makes sure that the agents use patterns for interacting, coordinating and synchronizing (e.g., handoff and others). Users can also specify teams in the configurations.
+- Agents may use tools via LLM-specific tool interfaces or the latest MCP version. Octopussy supports  MCP client and server mode. Octopussy provides a large selection of tools for web search, web download, file operations, OS operations, UI Operations, mail access (sending or receiving mail), etc. Users may add tools either by writing them themselves or by specifying additional MCP servers where tools are provided. Adding tools can happen at start-up time or run-time. All tools are stored in a tool registry. Tools must be thread-safe.
+- Octopussy must use ports that are not used by anything or anyone else. For example, it is a bad idea to use ports 80 or 8080 (Browsers) or 5050 (Synology).
+- All communication within Octopussy must be asynchronous. Messages may be sent back and forth between agents, component X and agents, external applications and agents.
+- Octopussy agents can also communicate via adapters with external tools, and vice versa. Per default, Octopussy support communication with Calendar, Mail, Telegram, WhatsApp, Messengers, REST Services. That means: users can send mails, messages, … to Octopussy and vice versa. Users may add other communication adapters even at runtime.
+- Octopussy defines a common message format for internal communication. For communication with external applications, communication adapters convert the internal message format to the format expected by the external applications (outbund communication). They must also support the convert external message formats to the internal message format. Communication adapters can be unidirectional (inbound or autbound) or bidirectional (inbound and outbound).
+- Octopussy provides message oriented communication such a gRPC, REST calls, messaging middleware. Additionally, it may provide an event and a topic bus iff useful.
+- Users may configure teams or single agents using .json or .md based configuration files. There are at least the following configuration files:
+    - traits.md defines traits of the agent such as behavior, communication style, format of completions (for example, text, json, xml, yaml)
+    - goal.md: what task should the agent solve, what steps should it use, what role should it assume, how should the result look like incl. the format of the completion, how should the agent operate (for example, REACT mode). Users may also configure full workflows for agents.
+    - permissions.md: what is an agent allowed to do - everything not permitted, is forbidden (principle of least privilege). The maximum number of input and output tokens per time period is also configured here.
+    - team.md: describes the goal of the team, the team organization such as Mesh Agents with Blackboard, Orchestrator/Worker, Pipeline, Tree, …, which agents need to be created and how they are related, in which order they should be initialized. If an agent A needs another agent B, B must be loaded and running before A.  For agents that cooperate for example in the Coordinator/Worker pattern, the Pipeline pattern, the Tree of Graph pattern, or the Bloackboard and Mesh agents pattern, either users should specify the micro processes that need to be implemented by the agents including their data exchange, communication with external applications, communication with Octopussy or users may ask Octopussy to generate these prompts/microprocesses.  Thus, usrs may specify the workflows of teams.
+    - intelligence.md defines the LLM to use by the agent, the parameter settings (temperature, top-p, top-k, …), …
+    - memory,md: here the user may provide background information and context to the agent. Octopussy must inject this information into the agent during agent initialization. 
+    - scheduler.md: times at which an agent should be created and started. This maybe one single time, or regularly following user-defined schedules
+- Octopussy offers a Scheduler and Timer that may create agents on specific datetimes or regularly using preconfigured schedules. This is similar to cronjob.
+- Octopussy must ensure the correct initialization order for Octopussy runtime components and agents. 
+- Each agent or team has its own configuration directory that must be passed to Octopussy (via CLI, Web UI, or API). Octopussy reads all the configuration files, creates an prompt and an LLM API for the agent using the configuration, and then starts the agent. It used dependency injection to pass all necessary dependencies to the Agent constructor. Octopussy must pass a sophisticated prompt to an agent. The prompt must define in detail what the agent is expected to provide or do. For this purpose it uses a prompt generator that creates sophisticated, optimized prompts smartly leveraging successful best practice prompt patterns.
+- Octopussy integrates speak-to-text and text-to-speak solutions, so that users may specify their tasks via their voice. 
+- Agents may use a RAG or GraphRAG approach to process documents. The Octopussy platform must provide all functionality to build up and use RAG or GraphRAG. Users should add the URLs or filepaths where these documents are available in a special section of memory.md. Using RAG, agents must chunk the documents, calculate embedding, support similarity search, rerankings, and so on. For a graph database (GraphRAG) agents must extract the core entities (using NER) and relate them to other entities in a graph. Agents can use the GraphRAG to extract information. All code for  RAG and GraphRAG must be provided by Octopussy, for example, in the AgentBase Class. There must be operations that allow an agent to remove vector and graph databases. GraphDatabase and VectorDatabase must be provided to shield the agent and Octopussy from specific providers of these databases. Per default, Octopussy integrates support for different graph and vector database systems like ChromaDB, pgVectors, pinecone, milvus, and more. Developers may provide support for additional  vector and graph databases. Agents may be allowed in the configutaion to search for documents in the web, download them and put them in the vector or graph databases.
+- Agents use Caching to store recent prompts and results.
+- Note: Instead of an LLM, the agent may also use a VLM. Instead of an LLMPort, it then gets passed a VLMPort. VLMs may be configured in intelligence.md instead of LLMs or in addition to LLMs. An agent may also obtain one LLMPort and VLMPort. It should also provide a LLMFallbackPort and a VLMFallbackPort that can be used alternatively when the LLMPort or the VLMPort connection fails. 
+- Per default, Octopussy and agents use the same LLM/VLM. This LLM/VLM is configured together with a Fallback LLM/FallbackVLM
+- Octopussy provides a router that can be queried by an agent to get the most appropriate, best LLM/VLM for its job. In this case the router needs to agent‘s task/goal description. The LLM router contains an extensible list of items where it maps family of prompts (such as code generation, math, story writing, and many more) to the most adequate LLM and vLLM depending on quality, cost, efficiency, … It provides the Agent with an LLMPort and/or VLMPort that points to the best LLM model. If a specific LLM is provided in the configuration, Octopussy will always use the configuration.  Same for LLMFallbackPort and VLMFallbackPort.
+- Th router may be also instructed to find the cheapest LLM/VLM instead of the best one for the job.
+- For all network connections agents must use patterns  such as Circuit-Breaker, Retry with exponential back-off. This should be handled by their base classes.
+- Octopussy must provide a diagram of the complete current agents when asked by  a client
+- Users may give agents a display name. That name is used in addition to the unique UUID when Octopussy shows the graph of currently running agents, so that users can better see the agents.
+- To avoid, unnecessary system load, Octopussy should pause all agents after a configured time period, and resume then again after a configured time period. If no agent is busy, Octopussy should do the same.
+- Agents must send heartbeats to the Octopussy runtime in configured time periods. This way, Octopussy may detect crashed or ill-functioning agents. It may also recreate these agents on demand.
+- Octopussy must ensure, no agent gets ever into an infinite loop. 
+- Octopussy must provide a lifecycle manager  for agents that monitors the system and sends events to agents. A newly created agent must register itself during initialization. Once terminated, the agent entries in Octopussy for that agent must be removed. Only logs and audit trails should never deleted to support non-repudiation 
+- All communication adapters, tools, MCP-Servers, LLM adapters, VLM adapters (LLMPort, LLMFallbackPort, VLMPort, VLMFallbackPort) must be registered with the Octopussy runtime. Further tools, MCP servers, communication adapters for an external application, LLM, vLLM adapters, Vector and GraphDatabase Adapters, and adapters for other inference engines are maintained by the Octopussy runtime. Octopussy provides a Plug-In architecture for that purpose. If not stated otherwise in permissions.md, all agents can access all adapters respectively plug-ins. Each adapter must come with a file plugin.md that specifies where the code of the plug-in is located, what type of adapter is provided, a short description of the adapter.  
+- Agents must be mainly self-managed and autonomous. They get a clear goal from Octopussy, a role, background information, optionally a RAG vector database and a GraphRAG graph database, the agents, applications, LLMs/VLMs, tools they have to communicate with. Octopussy manages a list of all agents currently running in the system. Agents can query Octopussy for the inbound queue of another agent. They can then use this queue to send messages to these peer agents using their outbound queue. The same holds for outbound communication with other applications, tools, etc.
+- Users can configure a critique agent CA for each agent A. A critique agent CA checks the output of agent A for logical, semantical, syntactical issues and errors and gives feedback to Agent A which then can improve its output. This is done until either the critique agent does not find any more issues or after the configurable maximal number of feedback iterations is achieved.

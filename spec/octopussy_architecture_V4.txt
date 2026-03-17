@@ -10,7 +10,7 @@ Date: 2026-03-17
 
 TABLE OF CONTENTS
 
-Vision &amp; Positioning
+Vision & Positioning
 Architectural Foundations
 System-Level CCA Capability Map
 Core Capabilities — Detailed Specification

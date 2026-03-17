@@ -1,0 +1,2133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCA Quick Reference Cards - Professional Edition</title>
+    <style>
+        /* ============================================
+           PRINT-OPTIMIZED STYLES
+           ============================================ */
+        
+        @page {
+            size: A4 portrait;
+            margin: 1.5cm;
+        }
+        
+        @media print {
+            .page-break {
+                page-break-after: always;
+                break-after: page;
+            }
+            
+            .no-break {
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+            
+            body {
+                font-size: 9pt;
+                line-height: 1.4;
+            }
+            
+            h1 { font-size: 18pt; }
+            h2 { font-size: 14pt; }
+            h3 { font-size: 12pt; }
+            h4 { font-size: 10pt; }
+            
+            pre, code {
+                font-size: 8pt;
+            }
+        }
+        
+        /* ============================================
+           BASE STYLES
+           ============================================ */
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #2c3e50;
+            background: #ffffff;
+            font-size: 10pt;
+        }
+        
+        .container {
+            max-width: 210mm;
+            margin: 0 auto;
+            background: white;
+        }
+        
+        /* ============================================
+           CARD STRUCTURE
+           ============================================ */
+        
+        .card {
+            border: 3px solid #667eea;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 2cm;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            background: white;
+        }
+        
+        .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .card-header h1 {
+            margin: 0;
+            font-size: 24pt;
+            font-weight: 700;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .card-header .subtitle {
+            margin-top: 8px;
+            font-size: 11pt;
+            opacity: 0.95;
+            font-weight: 300;
+        }
+        
+        .card-number {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 9pt;
+            margin-top: 8px;
+        }
+        
+        .card-body {
+            padding: 20px;
+        }
+        
+        .card-footer {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            border-top: 2px solid #667eea;
+            font-size: 9pt;
+            font-weight: 600;
+        }
+        
+        .card-footer.success {
+            background: #c8e6c9;
+            border-top-color: #4caf50;
+        }
+        
+        .card-footer.info {
+            background: #fff9c4;
+            border-top-color: #fbc02d;
+        }
+        
+        .card-footer.warning {
+            background: #ffccbc;
+            border-top-color: #ff5722;
+        }
+        
+        .card-footer.purple {
+            background: #e1bee7;
+            border-top-color: #9c27b0;
+        }
+        
+        .card-footer.blue {
+            background: #e1f5fe;
+            border-top-color: #03a9f4;
+        }
+        
+        /* ============================================
+           TWO-COLUMN LAYOUT
+           ============================================ */
+        
+        .two-columns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .column {
+            padding: 0;
+        }
+        
+        .column-divider {
+            border-right: 2px solid #e0e0e0;
+            padding-right: 20px;
+        }
+        
+        /* ============================================
+           TYPOGRAPHY
+           ============================================ */
+        
+        h2 {
+            color: #667eea;
+            margin: 20px 0 12px 0;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #667eea;
+            font-size: 14pt;
+        }
+        
+        h3 {
+            color: #764ba2;
+            margin: 16px 0 10px 0;
+            font-size: 12pt;
+        }
+        
+        h4 {
+            color: #667eea;
+            margin: 12px 0 8px 0;
+            font-size: 10pt;
+        }
+        
+        p {
+            margin: 8px 0;
+        }
+        
+        strong {
+            color: #2c3e50;
+            font-weight: 600;
+        }
+        
+        /* ============================================
+           LISTS
+           ============================================ */
+        
+        ul, ol {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+        
+        li {
+            margin: 4px 0;
+        }
+        
+        ul.checklist {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        ul.checklist li:before {
+            content: "☐ ";
+            color: #667eea;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+        
+        ul.emoji-list {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        /* ============================================
+           TABLES
+           ============================================ */
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+            font-size: 9pt;
+        }
+        
+        th {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 10px 8px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 9pt;
+        }
+        
+        td {
+            padding: 8px;
+            border: 1px solid #e0e0e0;
+            vertical-align: top;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        
+        /* ============================================
+           CODE BLOCKS
+           ============================================ */
+        
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 8.5pt;
+            color: #c7254e;
+        }
+        
+        pre {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 5px;
+            border-left: 4px solid #667eea;
+            overflow-x: auto;
+            margin: 12px 0;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 8pt;
+            line-height: 1.5;
+        }
+        
+        pre code {
+            background: none;
+            padding: 0;
+            color: #2c3e50;
+        }
+        
+        /* ============================================
+           BOXES & HIGHLIGHTS
+           ============================================ */
+        
+        .info-box {
+            background: #fff9c4;
+            padding: 12px;
+            border-left: 5px solid #fbc02d;
+            margin: 12px 0;
+            border-radius: 4px;
+        }
+        
+        .success-box {
+            background: #c8e6c9;
+            padding: 12px;
+            border-left: 5px solid #4caf50;
+            margin: 12px 0;
+            border-radius: 4px;
+        }
+        
+        .warning-box {
+            background: #ffccbc;
+            padding: 12px;
+            border-left: 5px solid #ff5722;
+            margin: 12px 0;
+            border-radius: 4px;
+        }
+        
+        .gradient-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 12px 0;
+        }
+        
+        .gradient-box h3,
+        .gradient-box h4 {
+            color: white;
+        }
+        
+        /* ============================================
+           ASCII ART / DIAGRAMS
+           ============================================ */
+        
+        .ascii-diagram {
+            background: #f8f9fa;
+            padding: 15px;
+            border: 2px solid #667eea;
+            border-radius: 5px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 7.5pt;
+            line-height: 1.3;
+            white-space: pre;
+            overflow-x: auto;
+            margin: 12px 0;
+        }
+        
+        /* ============================================
+           BADGES & LABELS
+           ============================================ */
+        
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 8pt;
+            font-weight: 600;
+            margin: 2px 4px 2px 0;
+        }
+        
+        .badge-required {
+            background: #e53935;
+            color: white;
+        }
+        
+        .badge-optional {
+            background: #4caf50;
+            color: white;
+        }
+        
+        .badge-high {
+            background: #ff5722;
+            color: white;
+        }
+        
+        .badge-medium {
+            background: #fbc02d;
+            color: white;
+        }
+        
+        .badge-low {
+            background: #4caf50;
+            color: white;
+        }
+        
+        /* ============================================
+           ICONS (using emoji)
+           ============================================ */
+        
+        .icon {
+            font-style: normal;
+            margin-right: 6px;
+        }
+        
+        /* ============================================
+           COVER PAGE
+           ============================================ */
+        
+        .cover {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .cover h1 {
+            font-size: 36pt;
+            margin-bottom: 20px;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.3);
+        }
+        
+        .cover .tagline {
+            font-size: 18pt;
+            margin-bottom: 40px;
+            font-weight: 300;
+            opacity: 0.95;
+        }
+        
+        .cover .description {
+            font-size: 12pt;
+            max-width: 600px;
+            line-height: 1.8;
+            margin-bottom: 40px;
+        }
+        
+        .cover .meta {
+            font-size: 10pt;
+            opacity: 0.8;
+            margin-top: 40px;
+        }
+        
+        /* ============================================
+           UTILITIES
+           ============================================ */
+        
+        .text-center {
+            text-align: center;
+        }
+        
+        .mt-1 { margin-top: 8px; }
+        .mt-2 { margin-top: 16px; }
+        .mb-1 { margin-bottom: 8px; }
+        .mb-2 { margin-bottom: 16px; }
+        
+        hr {
+            border: none;
+            border-top: 2px solid #e0e0e0;
+            margin: 16px 0;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ============================================
+     COVER PAGE
+     ============================================ -->
+
+<div class="cover page-break">
+    <h1>🎯 CAPABILITY-CENTRIC ARCHITECTURE</h1>
+    <div class="tagline">Quick Reference Cards</div>
+    <div class="description">
+        A comprehensive guide to implementing CCA - the unified architectural pattern 
+        for embedded and enterprise systems. These cards provide quick access to core 
+        concepts, best practices, and implementation guidelines.
+    </div>
+    <div style="margin-top: 60px; font-size: 14pt;">
+        <strong>11 Professional Reference Cards</strong><br>
+        Complete Implementation Guide
+    </div>
+    <div class="meta">
+        <div>Version 2.0 • December 2025</div>
+        <div> Michael Stal </div>
+    </div>
+</div>
+
+<!-- ============================================
+     CARD 1: CORE CONCEPTS & CAPABILITY NUCLEUS
+     ============================================ -->
+
+<div class="container page-break">
+    <div class="card no-break">
+        <div class="card-header">
+            <h1>🎯 Core Concepts & Capability Nucleus</h1>
+            <div class="subtitle">Understanding the Foundation of CCA</div>
+            <div class="card-number">Card 1 of 11</div>
+        </div>
+        
+        <div class="card-body">
+            <div class="two-columns">
+                <div class="column column-divider">
+                    <h3>📋 What is a Capability?</h3>
+                    <p><strong>Definition:</strong> A cohesive set of functionality that delivers tangible value.</p>
+                    
+                    <h4>✅ GOOD Examples:</h4>
+                    <ul class="emoji-list">
+                        <li>✓ Product Catalog manages product information</li>
+                        <li>✓ Payment Processing handles transactions</li>
+                        <li>✓ Motor Control regulates speed/position</li>
+                        <li>✓ User Authentication manages identity</li>
+                    </ul>
+                    
+                    <h4>❌ AVOID:</h4>
+                    <ul class="emoji-list">
+                        <li>✗ Database-Access-Capability</li>
+                        <li>✗ UI-Capability</li>
+                        <li>✗ Team-A-Capability</li>
+                    </ul>
+                    
+                    <div class="info-box mt-2">
+                        <strong>🎯 GOLDEN RULE:</strong> Express purpose in <strong>ONE sentence</strong>. 
+                        Focus on <strong>WHAT</strong>, not <strong>HOW</strong>. Based on 
+                        <strong>functionality</strong>, not layers.
+                    </div>
+                    
+                    <h3 class="mt-2">🏗️ The Nucleus (3 Layers)</h3>
+                    <div class="ascii-diagram">
+┌─────────────────────────────┐
+│   🌐 ADAPTATION             │
+│   External Interfaces       │
+│   REST, gRPC, UART, SPI     │
+└─────────────┬───────────────┘
+              │ Uses
+┌─────────────▼───────────────┐
+│   ⚙️ REALIZATION            │
+│   Infrastructure            │
+│   DB, HW, RTOS, Files       │
+└─────────────┬───────────────┘
+              │ Implements
+┌─────────────▼───────────────┐
+│   💎 ESSENCE                │
+│   Pure Domain Logic         │
+│   NO Infrastructure Deps    │
+└─────────────────────────────┘
+                    </div>
+                </div>
+                
+                <div class="column">
+                    <h3>📊 Layer Details</h3>
+                    <table>
+                        <tr>
+                            <th>Layer</th>
+                            <th>Purpose</th>
+                            <th>Dependencies</th>
+                        </tr>
+                        <tr>
+                            <td><strong>💎 ESSENCE</strong></td>
+                            <td>Define WHAT</td>
+                            <td>Only Contracts</td>
+                        </tr>
+                        <tr>
+                            <td><strong>⚙️ REALIZATION</strong></td>
+                            <td>Implement HOW</td>
+                            <td>Essence + Infra</td>
+                        </tr>
+                        <tr>
+                            <td><strong>🌐 ADAPTATION</strong></td>
+                            <td>External API</td>
+                            <td>Realization</td>
+                        </tr>
+                    </table>
+                    
+                    <h3 class="mt-2">💎 Essence Layer</h3>
+                    <p><strong>Contains:</strong></p>
+                    <ul>
+                        <li>Pure domain logic</li>
+                        <li>Core algorithms</li>
+                        <li>Business rules</li>
+                        <li>Domain state</li>
+                    </ul>
+                    
+                    <p><strong>Rules:</strong></p>
+                    <ul>
+                        <li>✅ NO database calls</li>
+                        <li>✅ NO file I/O</li>
+                        <li>✅ NO hardware access</li>
+                        <li>✅ ONLY other Capability Contracts</li>
+                    </ul>
+                    
+                    <h3 class="mt-2">⚙️ Realization Layer</h3>
+                    <p><strong>Contains:</strong> Database access, Hardware drivers, File I/O, 
+                    Message queues, RTOS calls, Cache management</p>
+                    
+                    <p><strong>Examples:</strong> PostgreSQL queries, GPIO/ADC access, Redis caching, 
+                    Kafka producers</p>
+                    
+                    <h3 class="mt-2">🌐 Adaptation Layer</h3>
+                    <p><strong>Contains:</strong> REST controllers, gRPC services, Message queue listeners, 
+                    UART/SPI handlers, WebSocket endpoints</p>
+                    
+                    <p><strong>Examples:</strong> <code>@RestController</code> classes, gRPC service 
+                    implementations, MQTT subscribers, CAN bus handlers</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card-footer success">
+            <strong>💡 KEY INSIGHT:</strong> Essence is pure and reusable. Realization adapts to environment. 
+            Adaptation exposes to world.
+        </div>
+    </div>
+</div>
+
+<!-- ============================================
+     CARD 2: CAPABILITY CONTRACTS
+     ============================================ -->
+
+<div class="container page-break">
+    <div class="card no-break">
+        <div class="card-header">
+            <h1>📜 Capability Contracts</h1>
+            <div class="subtitle">Provisions, Requirements & Protocols</div>
+            <div class="card-number">Card 2 of 11</div>
+        </div>
+        
+        <div class="card-body">
+            <div class="two-columns">
+                <div class="column column-divider">
+                    <h3>🎁 PROVISIONS</h3>
+                    <p><em>Interfaces I PROVIDE to others</em></p>
+                    
+                    <h4>Structure:</h4>
+<pre><code>new Provision(
+    "ServiceName",
+    ServiceInterface.class,
+    "Description of what it does"
+)</code></pre>
+                    
+                    <h4>Example Interface:</h4>
+<pre><code>public interface ProductService {
+    Product getProductDetails(String id);
+    List&lt;Product&gt; searchProducts(String query);
+}
+
+// Declaration:
+new Provision(
+    "ProductLookup",
+    ProductService.class,
+    "Provides product details and search"
+)</code></pre>
+                    
+                    <h3 class="mt-2">🔌 REQUIREMENTS</h3>
+                    <p><em>Interfaces I NEED from others</em></p>
+                    
+                    <h4>Structure:</h4>
+<pre><code>new Requirement(
+    "ServiceName",
+    ServiceInterface.class,
+    false,  // optional?
+    "Why I need this"
+)</code></pre>
+                    
+                    <h4>Example:</h4>
+<pre><code>new Requirement(
+    "PricingService",
+    PricingService.class,
+    false,  // REQUIRED
+    "Needed for product prices"
+)</code></pre>
+                    
+                    <h3 class="mt-2">📡 PROTOCOLS</h3>
+                    <p><em>HOW to interact with me</em></p>
+                    
+<pre><code>new Protocol(
+    "REST_HTTP",
+    "JSON",
+    Map.of("latency", "50ms",
+           "security", "OAuth2")
+)</code></pre>
+                </div>
+                
+                <div class="column">
+                    <h3>📝 Complete Contract Example</h3>
+<pre><code>CapabilityContract contract = 
+    new CapabilityContract(
+    
+    // 🎁 PROVISIONS
+    List.of(
+        new Provision(
+            "ProductLookup",
+            ProductService.class,
+            "Product details & search"
+        ),
+        new Provision(
+            "ProductEvents",
+            ProductEventPublisher.class,
+            "Product change events"
+        )
+    ),
+    
+    // 🔌 REQUIREMENTS
+    List.of(
+        new Requirement(
+            "PricingService",
+            PricingService.class,
+            false,  // Required
+            "For product prices"
+        ),
+        new Requirement(
+            "InventoryService",
+            InventoryService.class,
+            false,  // Required
+            "For stock levels"
+        )
+    ),
+    
+    // 📡 PROTOCOLS
+    List.of(
+        new Protocol("REST_HTTP", "JSON",
+            Map.of("latency", "50ms")),
+        new Protocol("gRPC", "Protobuf",
+            Map.of("latency", "20ms")),
+        new Protocol("DirectCall", "Binary",
+            Map.of("latency", "5ms"))
+    )
+);</code></pre>
+                    
+                    <h3 class="mt-2">🔄 Interaction Pattern</h3>
+                    <div class="ascii-diagram">
+ProductCatalog (Capability A)
+  🎁 PROVIDES: ProductService
+  🔌 REQUIRES: PricingService
+                    ▲
+                    │
+                    │ Fulfilled by
+                    │
+Pricing (Capability B)
+  🎁 PROVIDES: PricingService
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card-footer info">
+            <strong>💡 CONTRACT DESIGN PRINCIPLES:</strong>
+            ✅ Focus on WHAT (outcome), not HOW (implementation) •
+            ✅ Use Semantic Versioning (MAJOR.MINOR.PATCH) •
+            ✅ Keep stable yet flexible •
+            ✅ Support multiple protocols
+        </div>
+    </div>
+</div>
+
+<!-- ============================================
+     CARD 3: LIFECYCLE & DEPENDENCY INJECTION
+     ============================================ -->
+
+<div class="container page-break">
+    <div class="card no-break">
+        <div class="card-header">
+            <h1>🔄 Capability Lifecycle</h1>
+            <div class="subtitle">Initialization, Dependencies & State Management</div>
+            <div class="card-number">Card 3 of 11</div>
+        </div>
+        
+        <div class="card-body">
+            <div class="two-columns">
+                <div class="column column-divider">
+                    <h3>🎭 CapabilityInstance Interface</h3>
+<pre><code>public interface CapabilityInstance {
+    
+    // Phase 1: Setup
+    void initialize();
+    
+    // Phase 2: Begin work
+    void start();
+    
+    // Phase 3: Stop work
+    void stop();
+    
+    // Phase 4: Release resources
+    void cleanup();
+    
+    // Provide contract implementation
+    Object getContractImplementation(
+        Class&lt;?&gt; contractType
+    );
+    
+    // Receive dependencies
+    void injectDependency(
+        Class&lt;?&gt; contractType,
+        Object implementation
+    );
+}</code></pre>
+                    
+                    <h3 class="mt-2">📊 Lifecycle States</h3>
+                    <div class="ascii-diagram">
+📦 INSTANTIATED
+    ↓ initialize()
+🏁 INITIALIZED
+    ↓ injectDependency()
+🔌 DEPENDENCIES INJECTED
+    ↓ start()
+🚀 STARTED (Runtime)
+    ↓ stop()
+🛑 STOPPED
+    ↓ cleanup()
+🧹 CLEANED UP
+                    </div>
+                    
+                    <h3 class="mt-2">⚙️ Manager Responsibilities</h3>
+                    <p><strong>CapabilityLifecycleManager:</strong></p>
+                    <ol>
+                        <li>Build dependency graph</li>
+                        <li>Topological sort (correct order)</li>
+                        <li>Initialize capabilities</li>
+                        <li>Inject dependencies</li>
+                        <li>Start capabilities</li>
+                        <li>(Runtime operations)</li>
+                        <li>Stop capabilities (reverse order)</li>
+                        <li>Cleanup</li>
+                    </ol>
+                </div>
+                
+                <div class="column">
+                    <h3>💻 Implementation Example</h3>
+<pre><code>public class ProductCatalogCapability 
+    implements CapabilityInstance {
+    
+    private final ProductCatalogEssence essence;
+    private final DatabasePool database;
+    
+    // Dependencies (injected later)
+    private PricingService pricingService;
+    private InventoryService inventoryService;
+    
+    @Override
+    public void initialize() {
+        // Setup internal state
+        database.initializeSchema();
+        essence.loadInitialData();
+    }
+    
+    @Override
+    public void start() {
+        // Begin active operations
+        startBackgroundTasks();
+        openConnections();
+    }
+    
+    @Override
+    public void stop() {
+        // Graceful shutdown
+        stopBackgroundTasks();
+        closeConnections();
+    }
+    
+    @Override
+    public void cleanup() {
+        // Release resources
+        database.close();
+        cache.clear();
+    }
+    
+    @Override
+    public Object getContractImplementation(
+        Class&lt;?&gt; contractType) {
+        if (contractType == 
+            ProductService.class) {
+            return new ProductServiceImpl(this);
+        }
+        return null;
+    }
+    
+    @Override
+    public void injectDependency(
+        Class&lt;?&gt; contractType,
+        Object implementation) {
+        if (contractType == 
+            PricingService.class) {
+            this.pricingService = 
+                (PricingService) implementation;
+        }
+        // ... other dependencies
+    }
+}</code></pre>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card-footer success">
+            <strong>💡 KEY INSIGHT:</strong> Manager handles orchestration automatically. You just implement 
+            the interface. Dependencies are injected in correct order based on Contract declarations.
+        </div>
+    </div>
+</div>
+
+<!-- ============================================
+     CARD 4: EFFICIENCY GRADIENTS
+     ============================================ -->
+
+<div class="container page-break">
+    <div class="card no-break">
+        <div class="card-header">
+            <h1>⚡ Efficiency Gradients</h1>
+            <div class="subtitle">Performance Optimization Where You Need It</div>
+            <div class="card-number">Card 4 of 11</div>
+        </div>
+        
+        <div class="card-body">
+            <div class="two-columns">
+                <div class="column column-divider">
+                    <h3>🎯 Core Concept</h3>
+                    <p><strong>Not all code needs same optimization!</strong></p>
+                    <p>Different parts operate at different levels of performance and abstraction.</p>
+                    
+                    <h3 class="mt-2">📊 The Gradient Spectrum</h3>
+                    <div class="ascii-diagram">
+HIGH EFFICIENCY ←→ LOW EFFICIENCY
+LOW ABSTRACTION ←→ HIGH ABSTRACTION
+
+┌─────────────────────────────┐
+│ 🔥 CRITICAL PATH            │
+│ • Bare-metal code           │
+│ • Direct HW registers       │
+│ • Assembly                  │
+│ • RTOS interrupts           │
+│ ⏱️ Latency: Microseconds     │
+│ 📌 Use: Motor control,      │
+│   sensor interrupts         │
+└─────────────────────────────┘
+
+┌─────────────────────────────┐
+│ ⚙️ STANDARD PATH             │
+│ • Standard OS services      │
+│ • Compiled languages        │
+│ • Optimized libraries       │
+│ ⏱️ Latency: Milliseconds     │
+│ 📌 Use: Business logic,     │
+│   API calls, DB queries     │
+└─────────────────────────────┘
+
+┌─────────────────────────────┐
+│ 🌈 NON-CRITICAL PATH        │
+│ • Frameworks (Spring, etc.) │
+│ • GC languages (Java, etc.) │
+│ • ORMs, JSON parsing        │
+│ ⏱️ Latency: Seconds (OK)     │
+│ 📌 Use: Config, logging,    │
+│   admin tasks               │
+└─────────────────────────────┘
+                    </div>
+                    
+                    <h3 class="mt-2">🎨 When to Use Each</h3>
+                    <table>
+                        <tr>
+                            <th>Gradient</th>
+                            <th>Use For</th>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-high">High</span></td>
+                            <td>Real-time loops, interrupts, HFT</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-medium">Medium</span></td>
+                            <td>Most application code</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge badge-low">Low</span></td>
+                            <td>Config, logging, admin</td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <div class="column">
+                    <h3>💻 Example: Motor Control</h3>
+                    
+                    <h4>🔥 HIGH EFFICIENCY (Critical):</h4>
+<pre><code>// Runs every 100 microseconds
+private void onMotorInterrupt() {
+    // Direct HW register access
+    int pos = hardwareRegisters
+              .readEncoder();
+    
+    // Inline calculation
+    double speed = stateEstimator
+                   .estimateSpeed(pos);
+    
+    // Optimized PID (no allocations)
+    double output = pidController
+                    .calculate(speed, target);
+    
+    // Direct PWM write
+    pwmDriver.setDutyCycle(output);
+}</code></pre>
+                    <p><strong>⏱️ Latency:</strong> ~10 microseconds</p>
+                    
+                    <h4 class="mt-2">🌈 LOW EFFICIENCY (Non-Critical):</h4>
+<pre><code>// Runs on-demand (rarely)
+public void updateConfiguration(
+    String configData) {
+    
+    // JSON parsing (high-level)
+    JSONObject config = 
+        new JSONParser().parse(configData);
+    
+    // Network call
+    Params params = httpClient
+        .get("/api/motor-params");
+    
+    // Update essence
+    essence.setTargetSpeed(
+        config.getDouble("targetSpeed")
+    );
+    
+    // Database persistence
+    database.save("motor_config", config);
+}</code></pre>
+                    <p><strong>⏱️ Latency:</strong> ~500 milliseconds (acceptable)</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card-footer warning">
+            <strong>💡 KEY INSIGHT:</strong> Both methods can exist in the SAME Capability! Apply the right 
+            gradient to each function. Don't over-optimize non-critical paths. Don't under-optimize critical paths.
+        </div>
+    </div>
+</div>
+
+<!-- ============================================
+     CARD 5: VERSIONING & EVOLUTION
+     ============================================ -->
+
+<div class="container page-break">
+    <div class="card no-break">
+        <div class="card-header">
+            <h1>🔄 Evolution Envelopes</h1>
+            <div class="subtitle">Managing Change with Predictability</div>
+            <div class="card-number">Card 5 of 11</div>
+        </div>
+        
+        <div class="card-body">
+            <div class="two-columns">
+                <div class="column column-divider">
+                    <h3>📊 Semantic Versioning</h3>
+                    <div class="ascii-diagram">
+MAJOR . MINOR . PATCH
+  2   .   1   .   3
+                    </div>
+                    
+                    <table>
+                        <tr>
+                            <th>Component</th>
+                            <th>When to Increment</th>
+                            <th>Impact</th>
+                        </tr>
+                        <tr>
+                            <td><strong>MAJOR</strong></td>
+                            <td>Breaking changes</td>
+                            <td>Incompatible API</td>
+                        </tr>
+                        <tr>
+                            <td><strong>MINOR</strong></td>
+                            <td>New features</td>
+                            <td>Backward compatible</td>
+                        </tr>
+                        <tr>
+                            <td><strong>PATCH</strong></td>
+                            <td>Bug fixes</td>
+                            <td>Backward compatible</td>
+                        </tr>
+                    </table>
+                    
+                    <h3 class="mt-2">📝 Examples</h3>
+                    
+                    <h4>MAJOR (2.x.x → 3.0.0):</h4>
+                    <ul>
+                        <li>Remove method from interface</li>
+                        <li>Change method signature</li>
+                        <li>Change data format</li>
+                        <li>Remove entire provision</li>
+                    </ul>
+                    
+                    <h4>MINOR (2.1.x → 2.2.0):</h4>
+                    <ul>
+                        <li>Add new method to interface</li>
+                        <li>Add new provision</li>
+                        <li>Add optional parameter</li>
+                        <li>Enhance existing feature</li>
+                    </ul>
+                    
+                    <h4>PATCH (2.1.3 → 2.1.4):</h4>
+                    <ul>
+                        <li>Fix bug in logic</li>
+                        <li>Performance improvement</li>
+                        <li>Security patch</li>
+                        <li>Documentation fix</li>
+                    </ul>
+                    
+                    <h3 class="mt-2">🎯 Evolution Envelope</h3>
+<pre><code>public class EvolutionEnvelope {
+    String currentVersion;
+    String previousVersion;
+    List&lt;DeprecationPolicy&gt; deprecations;
+    List&lt;MigrationPath&gt; migrations;
+}</code></pre>
+                </div>
+                
+                <div class="column">
+                    <h3>⚠️ Deprecation Policy</h3>
+<pre><code>new DeprecationPolicy(
+    "Contract v1.x",           // What
+    LocalDate.of(2025, 12, 31), // EOL
+    "Performance improvements", // Why
+    "Use Contract v2.x"        // Replacement
+)</code></pre>
+                    
+                    <p><strong>Components:</strong></p>
+                    <ul>
+                        <li><strong>Target:</strong> What's being deprecated</li>
+                        <li><strong>Warning period:</strong> How long supported</li>
+                        <li><strong>EOL date:</strong> When support ends</li>
+                        <li><strong>Reason:</strong> Why deprecating</li>
+                        <li><strong>Replacement:</strong> What to use instead</li>
+                    </ul>
+                    
+                    <h3 class="mt-2">🔄 Migration Path</h3>
+<pre><code>new MigrationPath(
+    "1.5.0",                    // From
+    "2.0.0",                    // To
+    "https://docs.../migration", // Docs
+    "upgrade-script.sh"         // Tools
+)</code></pre>
+                    
+                    <p><strong>Includes:</strong></p>
+                    <ul>
+                        <li>Code examples</li>
+                        <li>Step-by-step guide</li>
+                        <li>Automated scripts</li>
+                        <li>Testing recommendations</li>
+                        <li>Rollback procedures</li>
+                    </ul>
+                    
+                    <h3 class="mt-2">📋 Version Strategy</h3>
+                    
+                    <h4>DO:</h4>
+                    <ul>
+                        <li>✅ Plan breaking changes carefully</li>
+                        <li>✅ Provide migration paths</li>
+                        <li>✅ Give adequate warning period</li>
+                        <li>✅ Support N-1 versions</li>
+                        <li>✅ Document all changes</li>
+                    </ul>
+                    
+                    <h4>DON'T:</h4>
+                    <ul>
+                        <li>❌ Break compatibility without notice</li>
+                        <li>❌ Skip version numbers</li>
+                        <li>❌ Change MAJOR version frequently</li>
+                        <li>❌ Deprecate without replacement</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card-footer purple">
+            <strong>💡 KEY INSIGHT:</strong> Evolution Envelopes make change predictable. Consumers know what 
+            to expect. Migrations are smooth. System stability is maintained.
+        </div>
+    </div>
+</div>
+
+<!-- ============================================
+     CARD 6: TESTING STRATEGY
+     ============================================ -->
+
+<div class="container page-break">
+    <div class="card no-break">
+        <div class="card-header">
+            <h1>🧪 Testing Strategy</h1>
+            <div class="subtitle">The Testing Pyramid for CCA</div>
+            <div class="card-number">Card 6 of 11</div>
+        </div>
+        
+        <div class="card-body">
+            <div class="two-columns">
+                <div class="column column-divider">
+                    <h3>📊 The Pyramid</h3>
+                    <div class="ascii-diagram">
+        ┌─────────┐
+        │   E2E   │  Few
+        │  Tests  │  Slow (mins)
+        └─────────┘  Full infra
+            ▲
+      ┌─────────────┐
+      │  CONTRACT   │  Some
+      │   Tests     │  Fast (secs)
+      └─────────────┘  Minimal infra
+            ▲
+    ┌───────────────────┐
+    │  INTEGRATION      │  More
+    │  Tests            │  Fast (secs)
+    │  (Realization)    │  Mocked infra
+    └───────────────────┘
+            ▲
+┌─────────────────────────┐
+│   UNIT Tests            │  Many
+│   (Essence)             │  Fastest (ms)
+│                         │  No infra
+└─────────────────────────┘
+                    </div>
+                    
+                    <h3 class="mt-2">📋 Test Layer Details</h3>
+                    <table>
+                        <tr>
+                            <th>Layer</th>
+                            <th>Speed</th>
+                            <th>Infra</th>
+                            <th>Focus</th>
+                        </tr>
+                        <tr>
+                            <td><strong>Unit</strong></td>
+                            <td>⚡ ms</td>
+                            <td>None</td>
+                            <td>Pure logic</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Integration</strong></td>
+                            <td>⏱️ secs</td>
+                            <td>Mocked</td>
+                            <td>Infra integration</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Contract</strong></td>
+                            <td>⏱️ secs</td>
+                            <td>Minimal</td>
+                            <td>Interface compliance</td>
+                        </tr>
+                        <tr>
+                            <td><strong>E2E</strong></td>
+                            <td>🐌 mins</td>
+                            <td>Full</td>
+                            <td>Complete workflows</td>
+                        </tr>
+                    </table>
+                    
+                    <h3 class="mt-2">🎯 Quantity Guide</h3>
+                    <ul>
+                        <li><strong>Unit:</strong> 🟢🟢🟢🟢🟢 (100s)</li>
+                        <li><strong>Integration:</strong> 🟡🟡🟡 (10s)</li>
+                        <li><strong>Contract:</strong> 🟡🟡 (5-10)</li>
+                        <li><strong>E2E:</strong> 🔴 (1-5)</li>
+                    </ul>
+                </div>
+                
+                <div class="column">
+                    <h3>💻 Unit Test (Essence)</h3>
+<pre><code>@Test
+void testProductSearch() {
+    // Arrange
+    ProductCatalogEssence essence = 
+        new ProductCatalogEssence();
+    essence.addProduct(
+        new Product("1", "Laptop", 999.99)
+    );
+    
+    // Act
+    List&lt;Product&gt; results = 
+        essence.searchProducts("Laptop");
+    
+    // Assert
+    assertEquals(1, results.size());
+    assertEquals("Laptop", 
+                 results.get(0).name());
+}</code></pre>
+                    <p>✅ <strong>Fast, no dependencies</strong></p>
+                    
+                    <h3 class="mt-2">💻 Integration Test (Realization)</h3>
+<pre><code>@Test
+void testDatabaseIntegration() {
+    // Arrange (with mocked DB)
+    DatabasePool mockDb = mock(DatabasePool.class);
+    ProductCatalogRealization realization = 
+        new ProductCatalogRealization(
+            essence, mockDb
+        );
+    
+    when(mockDb.query(anyString()))
+        .thenReturn(testProduct);
+    
+    // Act
+    Product result = 
+        realization.getProduct("1");
+    
+    // Assert
+    assertNotNull(result);
+    verify(mockDb).query(contains("SELECT"));
+}</code></pre>
+                    <p>✅ <strong>Tests infrastructure integration</strong></p>
+                    
+                    <h3 class="mt-2">💻 Contract Test</h3>
+<pre><code>@Test
+void testContractCompliance() {
+    ProductService service = 
+        capability.getContractImplementation(
+            ProductService.class
+        );
+    
+    // Verify all methods exist
+    assertNotNull(service);
+    assertNotNull(
+        service.getProductDetails("1")
+    );
+    assertNotNull(
+        service.searchProducts("test")
+    );
+}</code></pre>
+                    <p>✅ <strong>Verifies interface compliance</strong></p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card-footer success">
+            <strong>💡 KEY INSIGHT:</strong> Most tests should be Unit tests (Essence). They're fast, reliable, 
+            and test pure logic. Integration tests verify infrastructure. Contract tests ensure compatibility. 
+            E2E tests validate complete workflows.
+        </div>
+    </div>
+</div>
+
+<!-- ============================================
+     CARD 7: PACKAGING & DEPLOYMENT
+     ============================================ -->
+
+<div class="container page-break">
+    <div class="card no-break">
+        <div class="card-header">
+            <h1>📦 Packaging Strategies</h1>
+            <div class="subtitle">Bundles & Deployment Modes</div>
+            <div class="card-number">Card 7 of 11</div>
+        </div>
+        
+        <div class="card-body">
+            <div class="two-columns">
+                <div class="column column-divider">
+                    <h3>🎯 Golden Rules</h3>
+                    <ol>
+                        <li><strong>ALWAYS</strong> package Essence separately</li>
+                        <li>Create <strong>feature-based bundles</strong></li>
+                        <li>Use <strong>dependency injection</strong></li>
+                    </ol>
+                    
+                    <h3 class="mt-2">📦 Bundle Structure</h3>
+                    <div class="ascii-diagram">
+┌─────────────────────┐
+│  💎 ESSENCE PKG     │
+│  (Always Separate)  │
+│  • Pure logic       │
+│  • No dependencies  │
+│  • Highly reusable  │
+└──────────┬──────────┘
+           │ Used by
+    ┌──────┴──────┐
+    │             │
+┌───▼────┐   ┌───▼────┐
+│EMBEDDED│   │ENTERPRISE│
+│ BUNDLE │   │ BUNDLE  │
+├────────┤   ├─────────┤
+│Essence │   │ Essence │
+│Embedded│   │Enterprise│
+│Realiz. │   │Realiz.  │
+│Minimal │   │  Full   │
+│Adapt.  │   │ Adapt.  │
+└────────┘   └─────────┘
+                    </div>
+                    
+                    <h3 class="mt-2">🔧 Embedded Bundle</h3>
+                    <p><strong>Contains:</strong></p>
+                    <ul>
+                        <li>Essence (pure logic)</li>
+                        <li>Embedded Realization:
+                            <ul>
+                                <li>Direct HW access</li>
+                                <li>RTOS calls</li>
+                                <li>GPIO/ADC/Timers</li>
+                            </ul>
+                        </li>
+                        <li>Minimal Adaptation:
+                            <ul>
+                                <li>UART, SPI, CAN Bus, I2C</li>
+                            </ul>
+                        </li>
+                    </ul>
+                    
+                    <p><strong>Use for:</strong> IoT devices, Microcontrollers, Industrial control, 
+                    Automotive systems</p>
+                </div>
+                
+                <div class="column">
+                    <h3>☁️ Enterprise Bundle</h3>
+                    <p><strong>Contains:</strong></p>
+                    <ul>
+                        <li>Essence (same pure logic)</li>
+                        <li>Enterprise Realization:
+                            <ul>
+                                <li>PostgreSQL/MySQL</li>
+                                <li>Redis cache</li>
+                                <li>Kafka/RabbitMQ</li>
+                                <li>Elasticsearch</li>
+                            </ul>
+                        </li>
+                        <li>Full Adaptation:
+                            <ul>
+                                <li>REST API, gRPC, GraphQL, WebSockets</li>
+                            </ul>
+                        </li>
+                    </ul>
+                    
+                    <p><strong>Use for:</strong> Cloud platforms, Web applications, Microservices, 
+                    SaaS products</p>
+                    
+                    <h3 class="mt-2">🚀 Deployment Modes</h3>
+                    <table>
+                        <tr>
+                            <th>Mode</th>
+                            <th>Use Case</th>
+                        </tr>
+                        <tr>
+                            <td><strong>Monolithic</strong></td>
+                            <td>Development, debugging</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Microservice</strong></td>
+                            <td>Production, scalability</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Containerized</strong></td>
+                            <td>Cloud-native, K8s</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Serverless</strong></td>
+                            <td>Cost optimization</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Embedded</strong></td>
+                            <td>IoT, hardware</td>
+                        </tr>
+                    </table>
+                    
+                    <h3 class="mt-2">💡 Key Benefit</h3>
+                    <p><strong>Same Essence code runs everywhere!</strong></p>
+                    <div class="ascii-diagram">
+Essence (Pure Logic)
+    ↓
+    ├→ Embedded Bundle → IoT Device
+    ├→ Enterprise Bundle → Cloud
+    ├→ Test Bundle → CI/CD
+    └→ Mock Bundle → Development
+                    </div>
+                    
+                    <h3 class="mt-2">📋 Maven/Gradle Structure</h3>
+<pre><code>product-catalog/
+├── essence/          (JAR)
+├── embedded/         (JAR)
+├── enterprise/       (JAR)
+└── tests/            (JAR)</code></pre>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card-footer blue">
+            <strong>💡 KEY INSIGHT:</strong> Essence is environment-agnostic. Realization adapts to infrastructure. 
+            Adaptation exposes appropriate interfaces. One codebase, multiple deployments.
+        </div>
+    </div>
+</div>
+
+<!-- ============================================
+     CARD 8: EMBEDDED vs ENTERPRISE
+     ============================================ -->
+
+<div class="container page-break">
+    <div class="card no-break">
+        <div class="card-header">
+            <h1>🔧 Embedded vs ☁️ Enterprise</h1>
+            <div class="subtitle">Comparing Implementation Approaches</div>
+            <div class="card-number">Card 8 of 11</div>
+        </div>
+        
+        <div class="card-body">
+            <div class="two-columns">
+                <div class="column column-divider">
+                    <h3>🔧 Embedded Systems</h3>
+                    
+                    <h4>Realization Layer:</h4>
+                    <ul>
+                        <li>Direct hardware registers</li>
+                        <li>RTOS (FreeRTOS, Zephyr)</li>
+                        <li>GPIO, ADC, DAC, PWM</li>
+                        <li>Hardware timers</li>
+                        <li>Interrupt handlers</li>
+                        <li>DMA controllers</li>
+                        <li>Watchdog timers</li>
+                    </ul>
+                    
+                    <h4>Adaptation Layer:</h4>
+                    <ul>
+                        <li>UART (serial)</li>
+                        <li>SPI (sensors)</li>
+                        <li>I2C (peripherals)</li>
+                        <li>CAN Bus (automotive)</li>
+                        <li>Modbus (industrial)</li>
+                        <li>BLE (wireless)</li>
+                    </ul>
+                    
+                    <h4>Efficiency Gradients:</h4>
+                    <ul>
+                        <li>🔥 High efficiency critical</li>
+                        <li>Bare-metal for real-time</li>
+                        <li>Microsecond latency</li>
+                        <li>Direct HW access</li>
+                    </ul>
+                    
+                    <h4>Resource Management:</h4>
+                    <ul>
+                        <li>Explicit memory limits</li>
+                        <li>CPU allocation (%)</li>
+                        <li>Power budgets</li>
+                        <li>Stack/heap sizes</li>
+                    </ul>
+                    
+                    <h4>Testing:</h4>
+                    <ul>
+                        <li>Hardware-in-the-loop (HIL)</li>
+                        <li>Simulator tests</li>
+                        <li>Oscilloscope verification</li>
+                        <li>Timing analysis</li>
+                    </ul>
+                    
+                    <h4>Deployment:</h4>
+                    <ul>
+                        <li>Single binary</li>
+                        <li>Firmware update</li>
+                        <li>OTA (Over-The-Air)</li>
+                        <li>Flash memory</li>
+                    </ul>
+                    
+                    <h4>Example Capabilities:</h4>
+                    <ul>
+                        <li>Motor Control</li>
+                        <li>Sensor Reading</li>
+                        <li>Temperature Regulation</li>
+                        <li>Power Management</li>
+                    </ul>
+                </div>
+                
+                <div class="column">
+                    <h3>☁️ Enterprise Systems</h3>
+                    
+                    <h4>Realization Layer:</h4>
+                    <ul>
+                        <li>PostgreSQL, MySQL</li>
+                        <li>MongoDB, Cassandra</li>
+                        <li>Redis, Memcached</li>
+                        <li>Kafka, RabbitMQ</li>
+                        <li>Elasticsearch</li>
+                        <li>S3, Blob Storage</li>
+                        <li>HTTP clients</li>
+                    </ul>
+                    
+                    <h4>Adaptation Layer:</h4>
+                    <ul>
+                        <li>REST APIs</li>
+                        <li>gRPC services</li>
+                        <li>GraphQL endpoints</li>
+                        <li>WebSockets</li>
+                        <li>Server-Sent Events</li>
+                        <li>SOAP (legacy)</li>
+                    </ul>
+                    
+                    <h4>Efficiency Gradients:</h4>
+                    <ul>
+                        <li>⚙️ Medium efficiency OK</li>
+                        <li>Frameworks acceptable</li>
+                        <li>Millisecond latency</li>
+                        <li>Higher abstractions</li>
+                    </ul>
+                    
+                    <h4>Resource Management:</h4>
+                    <ul>
+                        <li>Auto-scaling policies</li>
+                        <li>Horizontal scaling</li>
+                        <li>Load balancing</li>
+                        <li>Container limits (K8s)</li>
+                    </ul>
+                    
+                    <h4>Testing:</h4>
+                    <ul>
+                        <li>Integration tests</li>
+                        <li>API contract tests</li>
+                        <li>Load testing</li>
+                        <li>Chaos engineering</li>
+                    </ul>
+                    
+                    <h4>Deployment:</h4>
+                    <ul>
+                        <li>Microservices</li>
+                        <li>Docker containers</li>
+                        <li>Kubernetes pods</li>
+                        <li>Serverless functions</li>
+                        <li>CI/CD pipelines</li>
+                    </ul>
+                    
+                    <h4>Example Capabilities:</h4>
+                    <ul>
+                        <li>Product Catalog</li>
+                        <li>Payment Processing</li>
+                        <li>User Authentication</li>
+                        <li>Order Management</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <h3 class="mt-2">🎯 Common Ground (Same for Both)</h3>
+            <table>
+                <tr>
+                    <th>Aspect</th>
+                    <th>Embedded & Enterprise</th>
+                </tr>
+                <tr>
+                    <td><strong>Essence</strong></td>
+                    <td>Pure domain logic, NO infrastructure dependencies</td>
+                </tr>
+                <tr>
+                    <td><strong>Contracts</strong></td>
+                    <td>Provisions, Requirements, Protocols</td>
+                </tr>
+                <tr>
+                    <td><strong>Lifecycle</strong></td>
+                    <td>initialize() → start() → stop() → cleanup()</td>
+                </tr>
+                <tr>
+                    <td><strong>Evolution</strong></td>
+                    <td>Semantic versioning, deprecation policies</td>
+                </tr>
+                <tr>
+                    <td><strong>Testing</strong></td>
+                    <td>Unit tests for Essence (fast, no infrastructure)</td>
+                </tr>
+            </table>
+        </div>
+        
+        <div class="card-footer success">
+            <strong>💡 KEY INSIGHT:</strong> CCA provides ONE architectural pattern for BOTH worlds. Essence stays 
+            the same. Realization and Adaptation change based on environment. This enables true code reuse across 
+            embedded and enterprise.
+        </div>
+    </div>
+</div>
+
+<!-- ============================================
+     CARD 9: DECISION TREE & CHECKLIST
+     ============================================ -->
+
+<div class="container page-break">
+    <div class="card no-break">
+        <div class="card-header">
+            <h1>🎯 Decision Tree & Checklist</h1>
+            <div class="subtitle">Step-by-Step Implementation Guide</div>
+            <div class="card-number">Card 9 of 11</div>
+        </div>
+        
+        <div class="card-body">
+            <div class="two-columns">
+                <div class="column column-divider">
+                    <h3>🌳 Decision Tree</h3>
+                    <div class="ascii-diagram" style="font-size: 7pt;">
+START: Need to add functionality
+    │
+    ▼
+Is it cohesive & valuable?
+    │
+    ├─ NO → Refine scope
+    │
+    ▼ YES
+Can I describe it in 1 sentence?
+    │
+    ├─ NO → Split into multiple
+    │
+    ▼ YES
+Create new Capability
+    │
+    ▼
+Define Essence (pure logic)
+    │
+    ▼
+What infrastructure needed?
+    │
+    ├─ Database? → Add to Realization
+    ├─ Hardware? → Add to Realization
+    ├─ Files? → Add to Realization
+    │
+    ▼
+How will it be accessed?
+    │
+    ├─ REST? → Add to Adaptation
+    ├─ gRPC? → Add to Adaptation
+    ├─ UART? → Add to Adaptation
+    │
+    ▼
+What does it PROVIDE?
+    │
+    └─ Define Provisions
+    │
+    ▼
+What does it REQUIRE?
+    │
+    └─ Define Requirements
+    │
+    ▼
+How should others interact?
+    │
+    └─ Define Protocols
+    │
+    ▼
+Is performance critical?
+    │
+    ├─ YES → High efficiency gradient
+    ├─ NO → Standard/low gradient
+    │
+    ▼
+Register with Registry
+    │
+    ▼
+Write tests (Unit → Integration)
+    │
+    ▼
+DONE!
+                    </div>
+                </div>
+                
+                <div class="column">
+                    <h3>✅ New Capability Checklist</h3>
+                    
+                    <h4>📋 Design Phase:</h4>
+                    <ul class="checklist">
+                        <li>Capability name describes cohesive functionality</li>
+                        <li>Purpose expressible in ONE sentence</li>
+                        <li>Not based on technical layer</li>
+                        <li>Not based on organizational boundary</li>
+                        <li>Clear value proposition</li>
+                    </ul>
+                    
+                    <h4>💎 Essence Phase:</h4>
+                    <ul class="checklist">
+                        <li>Pure domain logic only</li>
+                        <li>NO infrastructure dependencies</li>
+                        <li>NO database calls</li>
+                        <li>NO file I/O</li>
+                        <li>NO hardware access</li>
+                        <li>Only depends on other Contracts</li>
+                    </ul>
+                    
+                    <h4>⚙️ Realization Phase:</h4>
+                    <ul class="checklist">
+                        <li>Infrastructure integration identified</li>
+                        <li>Database access (if needed)</li>
+                        <li>Hardware drivers (if needed)</li>
+                        <li>File I/O (if needed)</li>
+                        <li>Message queues (if needed)</li>
+                    </ul>
+                    
+                    <h4>🌐 Adaptation Phase:</h4>
+                    <ul class="checklist">
+                        <li>External interfaces defined</li>
+                        <li>REST API (if needed)</li>
+                        <li>gRPC (if needed)</li>
+                        <li>UART/SPI (if needed)</li>
+                        <li>Message queue listeners (if needed)</li>
+                    </ul>
+                    
+                    <h4>📜 Contract Phase:</h4>
+                    <ul class="checklist">
+                        <li>Provisions defined (what I provide)</li>
+                        <li>Requirements defined (what I need)</li>
+                        <li>Protocols defined (how to interact)</li>
+                        <li>Optional vs required marked</li>
+                        <li>Descriptions written</li>
+                    </ul>
+                    
+                    <h4>🔄 Lifecycle Phase:</h4>
+                    <ul class="checklist">
+                        <li>CapabilityInstance implemented</li>
+                        <li>initialize() implemented</li>
+                        <li>start() implemented</li>
+                        <li>stop() implemented</li>
+                        <li>cleanup() implemented</li>
+                        <li>getContractImplementation() implemented</li>
+                        <li>injectDependency() implemented</li>
+                    </ul>
+                    
+                    <h4>🧪 Testing Phase:</h4>
+                    <ul class="checklist">
+                        <li>Unit tests for Essence (many)</li>
+                        <li>Integration tests for Realization (some)</li>
+                        <li>Contract tests (verify interfaces)</li>
+                        <li>E2E tests (few, critical paths)</li>
+                    </ul>
+                    
+                    <h4>📦 Packaging Phase:</h4>
+                    <ul class="checklist">
+                        <li>Essence packaged separately</li>
+                        <li>Feature bundles created</li>
+                        <li>Dependencies declared</li>
+                    </ul>
+                    
+                    <h4>📚 Documentation Phase:</h4>
+                    <ul class="checklist">
+                        <li>EvolutionEnvelope created</li>
+                        <li>Version number assigned</li>
+                        <li>Migration paths documented</li>
+                        <li>API documentation written</li>
+                    </ul>
+                    
+                    <h4>🚀 Deployment Phase:</h4>
+                    <ul class="checklist">
+                        <li>Registered with CapabilityRegistry</li>
+                        <li>Deployment mode selected</li>
+                        <li>Resource requirements declared (embedded)</li>
+                        <li>Monitoring configured</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card-footer success">
+            <strong>💡 PRO TIP:</strong> Use this checklist for every new Capability. It ensures you don't miss 
+            critical steps and maintain architectural consistency.
+        </div>
+    </div>
+</div>
+
+<!-- ============================================
+     CARD 10: PATTERNS & ANTI-PATTERNS
+     ============================================ -->
+
+<div class="container page-break">
+    <div class="card no-break">
+        <div class="card-header">
+            <h1>✅ Patterns & ❌ Anti-Patterns</h1>
+            <div class="subtitle">Best Practices & Common Mistakes</div>
+            <div class="card-number">Card 10 of 11</div>
+        </div>
+        
+        <div class="card-body">
+            <div class="two-columns">
+                <div class="column column-divider">
+                    <h3>✅ DO - Best Practices</h3>
+                    
+                    <h4>Design:</h4>
+                    <ul>
+                        <li>✅ Define by functional cohesion</li>
+                        <li>✅ One clear responsibility</li>
+                        <li>✅ Express in one sentence</li>
+                        <li>✅ Deliver tangible value</li>
+                    </ul>
+                    
+                    <h4>Essence:</h4>
+                    <ul>
+                        <li>✅ Keep pure (no infrastructure)</li>
+                        <li>✅ High test coverage</li>
+                        <li>✅ Reusable across environments</li>
+                        <li>✅ Only depend on Contracts</li>
+                    </ul>
+                    
+                    <h4>Contracts:</h4>
+                    <ul>
+                        <li>✅ Use Semantic Versioning</li>
+                        <li>✅ Document breaking changes</li>
+                        <li>✅ Provide migration paths</li>
+                        <li>✅ Support multiple protocols</li>
+                    </ul>
+                    
+                    <h4>Efficiency:</h4>
+                    <ul>
+                        <li>✅ Apply gradients strategically</li>
+                        <li>✅ Optimize critical paths</li>
+                        <li>✅ Use abstractions elsewhere</li>
+                        <li>✅ Measure before optimizing</li>
+                    </ul>
+                    
+                    <h4>Testing:</h4>
+                    <ul>
+                        <li>✅ Many unit tests (Essence)</li>
+                        <li>✅ Some integration tests</li>
+                        <li>✅ Contract compliance tests</li>
+                        <li>✅ Few E2E tests</li>
+                    </ul>
+                    
+                    <h4>Packaging:</h4>
+                    <ul>
+                        <li>✅ Separate Essence package</li>
+                        <li>✅ Feature-based bundles</li>
+                        <li>✅ Dependency injection</li>
+                        <li>✅ Clear module boundaries</li>
+                    </ul>
+                    
+                    <h4>Evolution:</h4>
+                    <ul>
+                        <li>✅ Plan breaking changes</li>
+                        <li>✅ Deprecate gracefully</li>
+                        <li>✅ Support N-1 versions</li>
+                        <li>✅ Document migrations</li>
+                    </ul>
+                </div>
+                
+                <div class="column">
+                    <h3>❌ DON'T - Anti-Patterns</h3>
+                    
+                    <h4>Design:</h4>
+                    <ul>
+                        <li>❌ Create by technical layer</li>
+                        <li>❌ Create by team structure</li>
+                        <li>❌ Too many responsibilities</li>
+                        <li>❌ Unclear value proposition</li>
+                    </ul>
+                    
+                    <h4>Essence:</h4>
+                    <ul>
+                        <li>❌ Mix infrastructure code</li>
+                        <li>❌ Direct database calls</li>
+                        <li>❌ File I/O in Essence</li>
+                        <li>❌ Hardware access in Essence</li>
+                    </ul>
+                    
+                    <h4>Contracts:</h4>
+                    <ul>
+                        <li>❌ Break without notice</li>
+                        <li>❌ Skip version numbers</li>
+                        <li>❌ Change frequently (MAJOR)</li>
+                        <li>❌ Undocumented changes</li>
+                    </ul>
+                    
+                    <h4>Efficiency:</h4>
+                    <ul>
+                        <li>❌ Over-optimize everything</li>
+                        <li>❌ Under-optimize critical paths</li>
+                        <li>❌ Ignore performance data</li>
+                        <li>❌ Premature optimization</li>
+                    </ul>
+                    
+                    <h4>Testing:</h4>
+                    <ul>
+                        <li>❌ Only E2E tests</li>
+                        <li>❌ No unit tests</li>
+                        <li>❌ Skip contract tests</li>
+                        <li>❌ Test with real infrastructure</li>
+                    </ul>
+                    
+                    <h4>Packaging:</h4>
+                    <ul>
+                        <li>❌ Mix Essence with Realization</li>
+                        <li>❌ Monolithic packages</li>
+                        <li>❌ Tight coupling</li>
+                        <li>❌ Circular dependencies</li>
+                    </ul>
+                    
+                    <h4>Evolution:</h4>
+                    <ul>
+                        <li>❌ Breaking changes without warning</li>
+                        <li>❌ No deprecation period</li>
+                        <li>❌ Missing migration docs</li>
+                        <li>❌ Support too many versions</li>
+                    </ul>
+                    
+                    <h3 class="mt-2">🚨 Common Mistakes</h3>
+                    
+                    <table>
+                        <tr>
+                            <th>Mistake</th>
+                            <th>Fix</th>
+                        </tr>
+                        <tr>
+                            <td><strong>Circular Dependencies</strong><br/>A requires B, B requires A</td>
+                            <td>Extract shared logic to C</td>
+                        </tr>
+                        <tr>
+                            <td><strong>God Capability</strong><br/>One Capability does everything</td>
+                            <td>Split into cohesive units</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Anemic Essence</strong><br/>Essence has no logic</td>
+                            <td>Move business rules to Essence</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Infrastructure in Essence</strong><br/>Database calls in Essence</td>
+                            <td>Move to Realization</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Missing Contracts</strong><br/>Direct coupling</td>
+                            <td>Define explicit Contracts</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card-footer warning">
+            <strong>⚠️ WARNING:</strong> Anti-patterns lead to tight coupling, difficult testing, and brittle 
+            architecture. Follow the DO list, avoid the DON'T list, and your system will be maintainable and evolvable.
+        </div>
+    </div>
+</div>
+
+<!-- ============================================
+     CARD 11: ONE-PAGE SUMMARY
+     ============================================ -->
+
+<div class="container page-break">
+    <div class="card no-break">
+        <div class="card-header">
+            <h1>🎯 One-Page Summary</h1>
+            <div class="subtitle">The Essentials at a Glance</div>
+            <div class="card-number">Card 11 of 11</div>
+        </div>
+        
+        <div class="card-body">
+            <h3>🏗️ The 3-Layer Nucleus</h3>
+            <div class="ascii-diagram">
+🌐 ADAPTATION → External interfaces (REST, gRPC, UART)
+        ↓ uses
+⚙️ REALIZATION → Infrastructure (DB, HW, Files, MQ)
+        ↓ implements
+💎 ESSENCE → Pure domain logic (NO infrastructure)
+            </div>
+            
+            <div class="two-columns mt-2">
+                <div class="column column-divider">
+                    <h3>📜 The Contract (3 Parts)</h3>
+<pre><code>CapabilityContract {
+    🎁 Provisions    // What I PROVIDE
+    🔌 Requirements  // What I NEED
+    📡 Protocols     // HOW to interact
+}</code></pre>
+                    
+                    <h3 class="mt-2">🔄 The Lifecycle (6 Phases)</h3>
+                    <div class="ascii-diagram">
+📦 Instantiated → 🏁 Initialized
+→ 🔌 Dependencies Injected → 🚀 Started
+→ 🛑 Stopped → 🧹 Cleaned Up
+                    </div>
+                    
+                    <h3 class="mt-2">⚡ Efficiency Gradients</h3>
+                    <ul>
+                        <li>🔥 Critical Path → High efficiency, low abstraction</li>
+                        <li>⚙️ Standard Path → Balanced</li>
+                        <li>🌈 Non-Critical → High abstraction, low efficiency</li>
+                    </ul>
+                    
+                    <h3 class="mt-2">📊 Semantic Versioning</h3>
+                    <div class="ascii-diagram">
+MAJOR.MINOR.PATCH
+  2  .  1  .  3
+
+MAJOR: Breaking changes
+MINOR: New features (compatible)
+PATCH: Bug fixes (compatible)
+                    </div>
+                </div>
+                
+                <div class="column">
+                    <h3>🧪 Testing Pyramid</h3>
+                    <div class="ascii-diagram">
+        E2E (Few)
+      Contract (Some)
+    Integration (More)
+  Unit/Essence (Many)
+                    </div>
+                    
+                    <h3 class="mt-2">📦 Packaging</h3>
+                    <div class="ascii-diagram">
+Essence (Separate) → Embedded Bundle
+                   → Enterprise Bundle
+                   → Test Bundle
+                    </div>
+                    
+                    <h3 class="mt-2">✅ Key Principles</h3>
+                    <ol>
+                        <li><strong>Capabilities</strong> = Cohesive functionality</li>
+                        <li><strong>Essence</strong> = Pure logic, no infrastructure</li>
+                        <li><strong>Contracts</strong> = Explicit dependencies</li>
+                        <li><strong>Gradients</strong> = Optimize where needed</li>
+                        <li><strong>Evolution</strong> = Predictable change</li>
+                        <li><strong>Testing</strong> = Pyramid (many unit, few E2E)</li>
+                        <li><strong>Packaging</strong> = Essence separate</li>
+                        <li><strong>Deployment</strong> = Same code, any environment</li>
+                    </ol>
+                    
+                    <h3 class="mt-2">🎯 Decision Flowchart</h3>
+                    <div class="ascii-diagram" style="font-size: 7pt;">
+New Feature? → Cohesive?
+→ Define Capability
+→ Pure Logic (Essence)
+→ Infrastructure (Realization)
+→ External API (Adaptation)
+→ Define Contract (P/R/P)
+→ Implement Lifecycle
+→ Write Tests
+→ Register & Deploy
+                    </div>
+                </div>
+            </div>
+            
+            <h3 class="mt-2">🚨 Remember</h3>
+            <table>
+                <tr>
+                    <th style="width: 33%;">✅ DO</th>
+                    <th style="width: 33%;">❌ DON'T</th>
+                    <th style="width: 34%;">🎯 GOAL</th>
+                </tr>
+                <tr>
+                    <td>Separate concerns<br/>Explicit contracts<br/>Test Essence</td>
+                    <td>Mix layers<br/>Circular deps<br/>Skip tests</td>
+                    <td>Maintainable<br/>Evolvable<br/>Performant systems</td>
+                </tr>
+            </table>
+        </div>
+        
+        <div class="card-footer" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;">
+            <h3 style="margin: 0; text-align: center; color: white;">🚀 YOU'RE READY TO BUILD WITH CCA!</h3>
+            <p style="text-align: center; margin: 10px 0;">Keep these cards handy for quick reference</p>
+            <p style="text-align: center; margin: 5px 0; font-size: 9pt;">Version 2.0 • December 2025 • Michael Stal </p>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

@@ -7,5 +7,5 @@ Currently, it exists as an architecture specification. For an interesting articl
 
 Specifications of Octopussy requirements, architecture and of Capability-Centric Architecture can be found in the spec subdirectory!
 
-**I am searching for contributors who want to help create the implementation. You may also help by reviewing the architecture specification.
-**
+** I am searching for contributors who want to help create the implementation. You may also help by reviewing the architecture specification.
+ **

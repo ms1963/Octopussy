@@ -4,6 +4,7 @@ OCTOPUSSY REQUIREMENTS SPECIFICATION V4
 All requirements below are of equal relevance. A requirement is not less important if its more at the middle or end of the requirements list.
 
 Here are the requirements:
+- Octopussy strictly follows the Capability-Centric Architecture Style/Framework
 - Octopussy must implement the following quality attributes
     - efficiency (prio 1)
     - security (prio 1)
@@ -28,7 +29,7 @@ Here are the requirements:
 - Octopussy should be completely based on Open Source: libraries, frameworks, middleware. Of course external systems like the LLM being used, social media like Telegram or Signal or Whatsapp, external systems like Calendars, Mail applications, Office applications can be commercial.  
 - Octopussy supports local and remote LLMs. For local LLM support it is able to leverage GPU architectures such as Nvidia CUDA, AMD ROCm, Intel, Vulkan, Apple MPS/MLX. It may run on CPU as well, but only if no other GPU is found. If multiple GPUs are available, it uses all GPUs (except the user configures Octopussy otherwise)
 - Octopussy integrates monitoring and observability services to allow developers and users watch the current state of affairs. For this purpose, it uses the Sidecar pattern.
-- Agents can be in different states. Not all of the following states make sense. You may add, remove or rename states: 
+- Agents can be in different states. Not all of the following states make sense. We may add, remove or rename states: 
     - initializing: agent is initializing
     - running: agent is started
     - sleeping: agent is sleeping
@@ -40,16 +41,16 @@ Here are the requirements:
     - inbound: agent is receiving and processing  inbound information (for example, from Octopussy, from the user (human or programmatic), from an external application, from an LLM. 
     - idle: agent is idle
     - terminated: agent has been terminated
-- Each agent must monitor its own token usage (input and output tokens). An agent gets a configured limit of maximum input and output tokens it may consume per time period. This time period is also configurable (for example, by hour, by day, by week, by month). The user may specify maximum capactities for more than one time period such as maximum per hour and maximum per day.  Whenever one day, one hour, one months have passed the capacity is set to its maximum again. An agent is not permitted to exceed its maximum capacity. Whenever it reaches the maximum capacity, it must pause. It can sleep and be woken up by Octopussy component X. For this purpose, the user is asked whether the Agent can/should exceed its maximum by providing a new larger volume. If the user agrees, the capacities will be updated and the agents resumed. Otherwise, the agents goes to sleep and can be woken up when it retrieves the full capacity for the next time period. Users may specify maximum costs an agent can consume in addition to specifying the token usage. Users must configure Octopussy with the actual costs per 1 Million tokens (inbound and outbound) for the specific LLM model being used. 
+- Each agent must monitor its own token usage (input and output tokens). An agent gets a configured limit of maximum input and output tokens it may consume per time period. This time period is also configurable (for example, by hour, by day, by week, by month). The user may specify maximum capactities for more than one time period such as maximum per hour and maximum per day.  Whenever one day, one hour, one month have passed, the capacity is set to its maximum again. An agent is not permitted to exceed its maximum capacity. Whenever it reaches the maximum capacity, it must pause. It can sleep and be woken up by Octopussy component X. For this purpose, the user is asked whether the Agent can/should exceed its maximum by providing a new larger volume. If the user agrees, the capacities will be updated and the agents resumed. Otherwise, the agents goes to sleep and can be woken up when it retrieves the full capacity for the next time period. Users may specify maximum costs an agent can consume in addition to specifying the token usage. Users must configure Octopussy with the actual costs per 1 Million tokens (inbound and outbound) for the specific LLM model being used. 
 - Agents and tools are not allowed to run freely on the host. For security reasons, an agent on a host is always running in an OS-dependent sand box or in a container.
 - Octopussy is secure. It implements guardrails, secures all communication connections, secures static data and data in motion, only allows agents to do what they are allowed to do by configuration, using the principle of least privilege, prevents agents from changing or accessing Octopussy‘s internals. Octopussy scans each prompt for prompt injection and other kinds of injections. 
 - Octopussy provides a secrets store (maybe part of the OS or an open source component). No secrets like API keys, passwords, etc. must ever be stored in configuration files or in code. The secrets store allows to avoid such security risks.
 - Octopussy supports all kinds of remote cloud-based LLMs, especially from OpenAI, Antrophic, Google, AWS, Azure.
 - It supports different inference solutions for local LLMs like Ollama, LMStudio, vLLM, SG Lang, Huggingface, MLX. All inference solutions must provide the capability to provide an OpenAI compatible API. Users may add other inference engines at runtime. LLMs are accessible using an LLMPort object. VLMs are accessible via a VLMPort object. For each agent created Octopussy provides an LLMPort object or a VLMPort object or both that it passes to the agent using dependency injection
 - Octopussy supports VLMs and multi-modal language models.
-- While a user can define a specific LLM to be used by an agent, an agent does not see which LLM it actually uses. It just gets an LLMPort (or VLMPort) object passed by dependency injection that implements communication between the agent and the LLM in a transparent way. Thus, a change of the LLM model does not affect the agent.
+- While a user can define a specific LLM to be used by an agent, an agent does not see which LLM it actually used. It just gets an LLMPort (or VLMPort) object passed by dependency injection that implements communication between the agent and the LLM in a transparent way. Thus, a change of the LLM model does not affect the agent.
 - Users may configure a fallback LLM (or VLM) that is used when the main LLM (or VLM) is not available. 
-- All agents follow the actor model. An actor/agent owns an inbound queue where other agents or components can send messages to the actor. This queue should be a priority queue. An actor extracts each incoming message (new prompt, or next prompt in a multi-turn conversation), does what is required to meet its goal) and sends the completion back to the sender of the message. Each message has a unique UUID. The corresponding completion includes exactly the same UUID so that there is a unique, unambigous correlation between request and result. There shall be no other way to access the functionality of an agent. In Octopussy, agents also have an outbound queue that they use for sending messages.
+- All agents follow the actor model. An actor/agent owns an inbound queue where other agents or components can send messages to the actor. This queue should be a priority queue. An actor extracts each incoming message (new prompt, or next prompt in a multi-turn conversation), does what is required to meet its goal) and sends the completion back to the sender of the message. Each message has a unique UUID. The corresponding completion includes exactly the same UUID so that there is a unique, unambigous correlation between request and result. There shall be no other way to access the functionality of an agent. In Octopussy, agents also have an outbound priority-based queue that they use for sending messages.
 - Each message/prompt sent to an agent, gets a unique UUID. When the agent sends back a completion to Octopussy, it must add this UUID. This approach helps Octopussy associate completions with prompts. 
 - The CLI and the WebUI create a user session for users. The chat history is then part of the agents memory. Each session is also associated with a session UUID to uniquely identify sessions. 
 - In addition, Octopussy assigns a unique UUID to all agents. It maintains a dictionary where Agent UUIDs are mapped to the actual agent implementation and their inbound queue reference.
@@ -65,11 +66,10 @@ Here are the requirements:
     - on wake_up: agents are woken up
     - on_deinit: agent should store its state, free all resources
     - on_stop: agent must terminate
-		When a stateful agent obtains an 				on_pause or on_resume, it should store its 		complete 	state to a persistent store and 		free all 			resources 		(only for 		on_sleep).   
-       	When it obtains an on_resume or 		
-		on_wakeup event, it should restore its 			state from the persistent store and obtain 		all necessary resources (on_wake_up 			only).
+		When a stateful agent obtains an on_pause or on_resume, it should store its complete state to a persistent store and 		free all resources 	(only for on_sleep).   
+       	When it obtains an on_resume or on_wakeup event, it should restore its state from the persistent store and obtain 		    all necessary resources (on_wake_up only).
 - An agent which has finished its work, sents the completion (result) back to its parent. For single agents the parent is a component called Octopussy Orchestrator.  This is the same component that created the agent. Worker agents inform their coordinator. 
-- Each Agent may use its own LLM, so that they can access the most appropriate LLM for a task.
+- Each Agent may be configured to use its own LLM, so that eacxh agent can access the most appropriate LLM for a task.
 - Octopussy supports different types of agents:
     - daemon agents are background agent that work in the background. We might use a daemon to search for specific documents in the web, download them and process them for RAG access.
     - stateless agents are agents that are idempotent. They do not have to manage state for their work. That implies, these agents get their states at thread start

@@ -1,4 +1,4 @@
-Octopussy Architecture Specification &amp; Implementation Skeleton v4.0.1
+Octopussy Architecture Specification & Implementation Skeleton v4.0.1
 Corrected, Completed, and Fully CCA 0.2–Compliant Edition
 
 Document Status: Production-Ready (Corrected)
@@ -43,7 +43,7 @@ Core Capabilities — Detailed Specification
 
 
 Built-in Tool Catalogue
-Actor Model &amp; Agent Architecture
+Actor Model & Agent Architecture
 Multi-Agent Team Patterns
 LLM/VLM Port Architecture
 Plugin Architecture
@@ -51,14 +51,14 @@ Security Architecture
 Quality Attribute Realization
 Design Patterns Reference Matrix
 Configuration Reference
-Capability Lifecycle &amp; Registry
+Capability Lifecycle & Registry
 Project Directory Structure
 Appendix A: Open Source Stack
 ADDENDUM A — END-TO-END WORKFLOW CATALOGUE
 ADDENDUM B — SYSTEM ARCHITECTURE DIAGRAM
 
 
-1. VISION &amp; POSITIONING
+1. VISION & POSITIONING
 1.1 What Is Octopussy?
 Octopussy is a production-grade, Python-native Agentic AI platform built entirely on Capability-Centric Architecture (CCA) 0.2 by Michael Stal. It provides a complete, pluggable, zero-trust runtime for deploying, orchestrating, and operating autonomous AI agents — from a single Raspberry Pi to a Kubernetes cluster.
 Every functional unit of Octopussy is a Capability with a strict three-layer Nucleus (Essence / Realization / Adaptation), a formal Contract (Provisions / Requirements / Protocols), a Capability Instance managed by the OctopussyCapabilityLifecycleManager (OCLM), and an Evolution Envelope. No exceptions.
@@ -129,7 +129,7 @@ Dynamic Actor model with AgentFactory
 
 Installation
 Complex, multi-step
-pip install octopussy &amp;&amp; octopussy install
+pip install octopussy && octopussy install
 
 
 Agent Creation
@@ -399,7 +399,7 @@ Shutdown proceeds in strict reverse order.
 
 4. CORE CAPABILITIES — DETAILED SPECIFICATION
 4.0 CCA Foundation Types
-4.0.1 Core Domain Types (Constants &amp; Enums)
+4.0.1 Core Domain Types (Constants & Enums)
 # octopussy/core/enums.py
 
 from __future__ import annotations

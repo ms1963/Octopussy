@@ -4,3 +4,5 @@
 Octopussy is an Open Source Agentic System
 
 Currently, it exists as an architecture specification. For an interesting article about Octopussy read: [Octopussy Article](http://stal.blogspot.com/2026/03/octopussy-open-source-agentic-ai.html)
+
+Specifications of Octopussy requirements, architecture and of Capabilizy-Centric Architecture can be found in the spec subdirectory!

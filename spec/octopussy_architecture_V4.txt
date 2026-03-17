@@ -21,7 +21,7 @@ Core Capabilities — Detailed Specification
 4.4 TeamCapability
 4.5 LLMRouterCapability
 4.6 MemoryCapability
-4.7 RAGCapability &amp; GraphRAGCapability
+4.7 RAGCapability & GraphRAGCapability
 4.8 ToolRegistryCapability
 4.9 PluginCapability
 4.10 MessagingCapability
@@ -632,7 +632,7 @@ class SecretsPort(ABC):
     @abstractmethod
     async def delete_secret(self, name: str) -> None: ...
 
-4.0.4 LLM Ports &amp; VLM Ports (Complete — All Providers)
+4.0.4 LLM Ports & VLM Ports (Complete — All Providers)
 # octopussy/core/ports/llm_ports.py
 
 from __future__ import annotations
@@ -1985,7 +1985,7 @@ DEPRECATION_POLICY     = "12 months notice before removal of any Contract method
 MIGRATION_GUIDE        = "docs/migration/memory_4_0.md"
 
 
-4.7 RAGCapability &amp; GraphRAGCapability
+4.7 RAGCapability & GraphRAGCapability
 Purpose: RAGCapability provides vector-based retrieval over document collections. GraphRAGCapability handles knowledge structured as a graph.
 RAGCapability
 │
@@ -3811,7 +3811,7 @@ The plugin module path
 
 Custom tools can be added via TOOL_PLUGIN plugins without modifying core code.
 
-6. ACTOR MODEL &amp; AGENT ARCHITECTURE
+6. ACTOR MODEL & AGENT ARCHITECTURE
 OctopussyAgent (ABC)
 │
 ├── StatelessOneShot          — executes once, returns result, terminates
@@ -4504,7 +4504,7 @@ tools:
       - "echo"
 
 
-14. CAPABILITY LIFECYCLE &amp; REGISTRY
+14. CAPABILITY LIFECYCLE & REGISTRY
 14.1 CapabilityFactory
 # octopussy/core/capability_factory.py
 
@@ -5638,7 +5638,7 @@ Outcome: Tool result returned to agent; sandbox enforced throughout.
         └── audit: TOOL_EXECUTED event (tool_id, agent_id, success, duration)
 
 
-A.8 Error Handling &amp; Dead Letter Queue (DLQ) Workflow
+A.8 Error Handling & Dead Letter Queue (DLQ) Workflow
 Trigger: Message delivery fails after dlq.max_retries attempts, or an agent raises an unhandled exception.
 Outcome: Message is persisted to the DLQ; alert emitted; agent transitions to ERROR state if applicable.
 SCENARIO A — Message delivery failure:
@@ -5901,7 +5901,7 @@ B.1 Legend
 
 B.2 Full System Architecture Diagram
 ╔══════════════════════════════════════════════════════════════════════════════════╗
-║                         EXTERNAL CLIENTS &amp; CHANNELS                           ║
+║                         EXTERNAL CLIENTS & CHANNELS                           ║
 ║                                                                                   ║
 ║  ╔══════════╗  ╔══════════╗  ╔══════════╗  ╔══════════╗   ╔════════════════════╗  ║
 ║  ║ REST API ║  ║ gRPC API ║  ║  WebUI   ║  ║   CLI    ║   ║ Telegram/Slack/    ║  ║
@@ -5985,7 +5985,7 @@ B.2 Full System Architecture Diagram
 │  └──────────────────────────────────────────────────────────────────────────────┘    │
 │                                                                                      │
 │  ┌───────────────────────────────────────────────────────────────────────────────┐   │
-│  │                       INTELLIGENCE &amp; KNOWLEDGE LAYER                      │   │
+│  │                       INTELLIGENCE & KNOWLEDGE LAYER                      │   │
 │  │                                                                               │   │
 │  │  ┌──────────────────────────────────────────────────────────────────────┐     │   │
 │  │  │  LLMRouterCapability                                                 │     │   │
@@ -6019,7 +6019,7 @@ B.2 Full System Architecture Diagram
 │  └───────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                      │
 │  ┌───────────────────────────────────────────────────────────────────────────────┐   │
-│  │                      TOOL &amp; EXECUTION LAYER                               │   │
+│  │                      TOOL & EXECUTION LAYER                               │   │
 │  │                                                                               │   │
 │  │  ┌──────────────────────────────────────────────────────────────────────┐     │   │
 │  │  │  ToolRegistryCapability                                              │     │   │
@@ -6041,7 +6041,7 @@ B.2 Full System Architecture Diagram
 │  └───────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                      │
 │  ┌───────────────────────────────────────────────────────────────────────────────┐   │
-│  │                    MESSAGING &amp; COMMUNICATION LAYER                        │   │
+│  │                    MESSAGING & COMMUNICATION LAYER                        │   │
 │  │                                                                               │   │
 │  │  ┌──────────────────────────────────────────────────────────────────────┐     │   │
 │  │  │  MessagingCapability                                                 │     │   │
@@ -6072,7 +6072,7 @@ B.2 Full System Architecture Diagram
 │  └───────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                      │
 │  ┌───────────────────────────────────────────────────────────────────────────────┐   │
-│  │                       SECURITY &amp; SECRETS LAYER                            │   │
+│  │                       SECURITY & SECRETS LAYER                            │   │
 │  │                                                                               │   │
 │  │  ┌──────────────────────────────────────────────────────────────────────┐     │   │
 │  │  │  SecurityCapability                                                  │     │   │
@@ -6091,7 +6091,7 @@ B.2 Full System Architecture Diagram
 │  └───────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                      │
 │  ┌───────────────────────────────────────────────────────────────────────────────┐   │
-│  │                     CONFIGURATION &amp; REGISTRY LAYER                        │   │
+│  │                     CONFIGURATION & REGISTRY LAYER                        │   │
 │  │                                                                               │   │
 │  │  ┌──────────────────────────────────┐  ┌──────────────────────────────────┐   │   │
 │  │  │  ConfigurationCapability         │  │  OctopussyCapabilityRegistry     │   │   │
@@ -6203,7 +6203,7 @@ Shutdown: 26 → 1 (strict reverse topological order)
 
 B.5 Network Port Map (Normative)
 ┌──────────┬──────────────┬───────────────────────────────────────────────────────┐
-│  Port    │  Protocol    │  Purpose &amp; Capability                             │
+│  Port    │  Protocol    │  Purpose & Capability                             │
 ├──────────┼──────────────┼───────────────────────────────────────────────────────┤
 │  47200   │  HTTPS/REST  │  REST API — OrchestratorCapability (inbound)          │
 │  47201   │  gRPC/mTLS   │  gRPC API — OrchestratorCapability (inbound)          │
@@ -6284,9 +6284,9 @@ Inbound Request
 
 
 
-These addendums are normative supplements to Octopussy Architecture Specification &amp; Implementation Skeleton v4.0.1. They carry the same authority as the base document. All content is fully consistent with CCA 0.2 by Michael Stal, the six-phase Capability lifecycle, and the zero-trust security model specified in the base document.
+These addendums are normative supplements to Octopussy Architecture Specification & Implementation Skeleton v4.0.1. They carry the same authority as the base document. All content is fully consistent with CCA 0.2 by Michael Stal, the six-phase Capability lifecycle, and the zero-trust security model specified in the base document.
 
 
 
-End of Octopussy Architecture Specification &amp; Implementation Skeleton v4.0.1
+End of Octopussy Architecture Specification & Implementation Skeleton v4.0.1
 This document is the single, authoritative, production-ready specification for Octopussy v4.0.1. It is sufficient for developers or an LLM to implement the complete platform. All 26 Capabilities are fully specified with CCA 0.2 Nucleus (Essence/Realization/Adaptation), Contract (Provisions/Requirements/Protocols), Capability Instance definition, Capability Lifecycle Manager, Capability Registry, and Evolution Envelope. All design patterns are applied. MCP 2025-11-25 Streamable HTTP transport is the exclusive mechanism for all tool calls. The architecture strictly conforms to CCA 0.2 by Michael Stal. Both inQ and outQ are asyncio.PriorityQueue instances keyed by MessagePriority. All built-in tools are fully catalogued in Chapter 5. The Dead Letter Queue is fully specified in MessagingCapability with its own DLQPort, DLQStore, and persistence guarantee. All LLMPorts and VLMPorts delivered by default are fully enumerated. All RAGPorts and GraphPorts for all supported databases are fully specified. LLMPort and VLMPort define both cloud-provided and local inference engine providers; Octopussy calls their REST APIs via httpx and does not manage GPU hardware directly. API tokens and credentials for all LLM providers are managed by users via SecretsCapability (CLI or WebUI Credentials Manager) and retrieved by LLMRouterCapability at call time. Users are registered, validated, authenticated, and authorized by SecurityCapability and UserSessionCapability. All CommunicationPorts for all supported protocols (NATS, RabbitMQ, REST, gRPC, MCP, WebSocket, InMemoryBus) are fully specified. 🐙

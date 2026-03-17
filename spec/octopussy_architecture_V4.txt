@@ -5901,25 +5901,25 @@ B.1 Legend
 
 B.2 Full System Architecture Diagram
 ╔══════════════════════════════════════════════════════════════════════════════════╗
-║                         EXTERNAL CLIENTS &amp; CHANNELS                            ║
-║                                                                                  ║
-║  ╔══════════╗  ╔══════════╗  ╔══════════╗  ╔══════════╗  ╔════════════════════╗ ║
-║  ║ REST API ║  ║ gRPC API ║  ║  WebUI   ║  ║   CLI    ║  ║ Telegram/Slack/    ║ ║
-║  ║  Client  ║  ║  Client  ║  ║ Browser  ║  ║  User    ║  ║ WhatsApp/Signal/   ║ ║
-║  ╚════╤═════╝  ╚════╤═════╝  ╚════╤═════╝  ╚════╤═════╝  ║ Messenger          ║ ║
-║       │ HTTPS       │ gRPC        │ WSS          │ CLI     ╚═════════╤══════════╝ ║
+║                         EXTERNAL CLIENTS &amp; CHANNELS                           ║
+║                                                                                   ║
+║  ╔══════════╗  ╔══════════╗  ╔══════════╗  ╔══════════╗   ╔════════════════════╗  ║
+║  ║ REST API ║  ║ gRPC API ║  ║  WebUI   ║  ║   CLI    ║   ║ Telegram/Slack/    ║  ║
+║  ║  Client  ║  ║  Client  ║  ║ Browser  ║  ║  User    ║   ║ WhatsApp/Signal/   ║  ║
+║  ╚════╤═════╝  ╚════╤═════╝  ╚════╤═════╝  ╚════╤═════╝   ║ Messenger          ║  ║
+║       │ HTTPS       │ gRPC        │ WSS          │ CLI    ╚═════════╤══════════╝  ║
 ║       │ :47200      │ :47201      │ :47202       │                   │ Webhooks   ║
 ╚═══════╪═════════════╪═════════════╪══════════════╪═══════════════════╪════════════╝
         │             │             │              │                   │
 ┌───────▼─────────────▼─────────────▼──────────────▼───────────────────▼────────────┐
-│                         OCTOPUSSY PLATFORM BOUNDARY                                │
-│                                                                                    │
-│  ┌──────────────────────────────────────────────────────────────────────────────┐  │
-│  │  [Sidecar]  ObservabilityCapability                                          │  │
-│  │  TracingEngine │ LoggingEngine │ MetricsEngine │ AuditEngine                 │  │
-│  │  OTLPExporter (:4317) │ PrometheusExporter (:9090)                          │  │
-│  │  ObservabilityPort ──[DI]──► injected into ALL 26 Capabilities              │  │
-│  └──────────────────────────────────────────────────────────────────────────────┘  │
+│                         OCTOPUSSY PLATFORM BOUNDARY                               │
+│                                                                                   │
+│  ┌──────────────────────────────────────────────────────────────────────────────┐ │
+│  │  [Sidecar]  ObservabilityCapability                                          │ │
+│  │  TracingEngine │ LoggingEngine │ MetricsEngine │ AuditEngine                 │ │
+│  │  OTLPExporter (:4317) │ PrometheusExporter (:9090)                           │ │
+│  │  ObservabilityPort ──[DI]──► injected into ALL 26 Capabilities               │ │
+│  └──────────────────────────────────────────────────────────────────────────────┘ │
 │                                                                                    │
 │  ┌─────────────────────┐    ┌──────────────────────┐    ┌───────────────────────┐  │
 │  │ OrchestratorCapab.  │    │  WebUICapability      │    │  CLICapability        │  │
@@ -5985,22 +5985,22 @@ B.2 Full System Architecture Diagram
 │  └──────────────────────────────────────────────────────────────────────────────┘    │
 │                                                                                      │
 │  ┌───────────────────────────────────────────────────────────────────────────────┐   │
-│  │                       INTELLIGENCE &amp; KNOWLEDGE LAYER                          │   │
+│  │                       INTELLIGENCE &amp; KNOWLEDGE LAYER                      │   │
 │  │                                                                               │   │
-│  │  ┌──────────────────────────────────────────────────────────────────────┐    │   │
-│  │  │  LLMRouterCapability                                                  │    │   │
-│  │  │  RoutingEngine: COST │ QUALITY │ BALANCED │ LOCAL │ CLOUD             │    │   │
-│  │  │  CircuitBreaker + Retry + Fallback chain                              │    │   │
-│  │  │  GPU auto-detect: CUDA │ ROCm │ MPS/MLX │ Intel │ Vulkan │ CPU       │    │   │
-│  │  │                                                                       │    │   │
-│  │  │  LOCAL Ports:  OllamaLLMPort │ LMStudioLLMPort │ VLLMLLMPort        │    │   │
-│  │  │                SGLangLLMPort │ HuggingFaceLLMPort │ MLXLLMPort       │    │   │
-│  │  │  CLOUD Ports:  OpenAILLMPort │ AnthropicLLMPort │ GeminiLLMPort     │    │   │
-│  │  │                BedrockLLMPort │ AzureOpenAILLMPort                   │    │   │
-│  │  │  VLM Ports:    (same providers, VLMPort interface)                   │    │   │
-│  │  └──────────────────────────────────────────────────────────────────────┘    │   │
+│  │  ┌──────────────────────────────────────────────────────────────────────┐     │   │
+│  │  │  LLMRouterCapability                                                 │     │   │
+│  │  │  RoutingEngine: COST │ QUALITY │ BALANCED │ LOCAL │ CLOUD            │     │   │
+│  │  │  CircuitBreaker + Retry + Fallback chain                             │     │   │
+│  │  │  GPU auto-detect: CUDA │ ROCm │ MPS/MLX │ Intel │ Vulkan │ CPU       │     │   │
+│  │  │                                                                      │     │   │
+│  │  │  LOCAL Ports:  OllamaLLMPort │ LMStudioLLMPort │ VLLMLLMPort         │     │   │
+│  │  │                SGLangLLMPort │ HuggingFaceLLMPort │ MLXLLMPort       │     │   │
+│  │  │  CLOUD Ports:  OpenAILLMPort │ AnthropicLLMPort │ GeminiLLMPort      │     │   │
+│  │  │                BedrockLLMPort │ AzureOpenAILLMPort                   │     │   │
+│  │  │  VLM Ports:    (same providers, VLMPort interface)                   │     │   │
+│  │  └──────────────────────────────────────────────────────────────────────┘     │   │
 │  │                                                                               │   │
-│  │  ┌──────────────────────┐  ┌──────────────────────┐  ┌────────────────────┐  │   │
+│  │  ┌──────────────────────┐  ┌──────────────────────┐  ┌────────────────────┐   │   │
 │  │  │  MemoryCapability    │  │  RAGCapability        │  │ GraphRAGCapability │  │   │
 │  │  │  ConversationStore   │  │  DocumentChunker      │  │ GraphQueryEngine   │  │   │
 │  │  │  LongTermStore       │  │  EmbeddingEngine      │  │ HopTraverser       │  │   │
@@ -6008,97 +6008,97 @@ B.2 Full System Architecture Diagram
 │  │  └──────────────────────┘  │  ChromaDB │ PGVector  │  │ ArangoDB           │  │   │
 │  │                            │  Weaviate │ Qdrant    │  └────────────────────┘  │   │
 │  │                            │  Milvus   │ Plugin    │                          │   │
-│  │                            └──────────────────────┘                          │   │
+│  │                            └──────────────────────┘                           │   │
 │  │                                                                               │   │
-│  │  ┌──────────────────────┐  ┌──────────────────────┐  ┌────────────────────┐  │   │
+│  │  ┌──────────────────────┐  ┌──────────────────────┐  ┌────────────────────┐   │   │
 │  │  │  PromptEngineCapab.  │  │  CritiqueCapability   │  │ TokenBudgetCapab.  │  │   │
 │  │  │  PromptCatalog       │  │  CritiqueEngine       │  │ BudgetStore        │  │   │
 │  │  │  TemplateEngine      │  │  RevisionEngine       │  │ (SQLite/Redis)     │  │   │
 │  │  │  PatternRegistry     │  │  (Critique-and-Revise)│  │ per-agent/period   │  │   │
-│  │  └──────────────────────┘  └──────────────────────┘  └────────────────────┘  │   │
+│  │  └──────────────────────┘  └──────────────────────┘  └────────────────────┘   │   │
 │  └───────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                      │
 │  ┌───────────────────────────────────────────────────────────────────────────────┐   │
-│  │                      TOOL &amp; EXECUTION LAYER                                   │   │
+│  │                      TOOL &amp; EXECUTION LAYER                               │   │
 │  │                                                                               │   │
-│  │  ┌──────────────────────────────────────────────────────────────────────┐    │   │
-│  │  │  ToolRegistryCapability                                               │    │   │
-│  │  │  ToolDescriptorStore │ PermissionChecker │ SchemaValidator            │    │   │
-│  │  │                                                                       │    │   │
-│  │  │  Built-in Tools:                                                      │    │   │
-│  │  │  web_search │ web_download │ web_scrape │ file_read │ file_write      │    │   │
-│  │  │  file_delete │ code_execute │ os_command │ ui_automation              │    │   │
-│  │  │  mail_read │ mail_send │ calendar_read │ calendar_write               │    │   │
-│  │  │                                                                       │    │   │
-│  │  │  All tool calls: MCP 2025-11-25 Streamable HTTP → port :47203        │    │   │
-│  │  └──────────────────────────────────────────────────────────────────────┘    │   │
+│  │  ┌──────────────────────────────────────────────────────────────────────┐     │   │
+│  │  │  ToolRegistryCapability                                              │     │   │
+│  │  │  ToolDescriptorStore │ PermissionChecker │ SchemaValidator           │     │   │
+│  │  │                                                                      │     │   │
+│  │  │  Built-in Tools:                                                     │     │   │
+│  │  │  web_search │ web_download │ web_scrape │ file_read │ file_write     │     │   │
+│  │  │  file_delete │ code_execute │ os_command │ ui_automation             │     │   │
+│  │  │  mail_read │ mail_send │ calendar_read │ calendar_write              │     │   │
+│  │  │                                                                      │     │   │
+│  │  │  All tool calls: MCP 2025-11-25 Streamable HTTP → port :47203        │     │   │
+│  │  └──────────────────────────────────────────────────────────────────────┘     │   │
 │  │                                                                               │   │
-│  │  ┌──────────────────────────────────────────────────────────────────────┐    │   │
-│  │  │  SandboxCapability                                                    │    │   │
-│  │  │  Docker │ gVisor │ seccomp │ macOS Sandbox                           │    │   │
-│  │  │  Network allowlist │ Filesystem isolation │ Bulkhead pattern         │    │   │
-│  │  └──────────────────────────────────────────────────────────────────────┘    │   │
+│  │  ┌──────────────────────────────────────────────────────────────────────┐     │   │
+│  │  │  SandboxCapability                                                   │     │   │
+│  │  │  Docker │ gVisor │ seccomp │ macOS Sandbox                           │     │   │
+│  │  │  Network allowlist │ Filesystem isolation │ Bulkhead pattern         │     │   │
+│  │  └──────────────────────────────────────────────────────────────────────┘     │   │
 │  └───────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                      │
 │  ┌───────────────────────────────────────────────────────────────────────────────┐   │
-│  │                    MESSAGING &amp; COMMUNICATION LAYER                            │   │
+│  │                    MESSAGING &amp; COMMUNICATION LAYER                        │   │
 │  │                                                                               │   │
-│  │  ┌──────────────────────────────────────────────────────────────────────┐    │   │
-│  │  │  MessagingCapability                                                  │    │   │
-│  │  │  NATSCommunicationPort  (nats://host:4222)  ← default                │    │   │
-│  │  │  RabbitMQCommunicationPort (amqp://host:5672) ← optional             │    │   │
-│  │  │  DLQPort → DLQStore (SQLite │ Redis)                                 │    │   │
-│  │  │  RetryPolicy: 3 attempts, exponential backoff                        │    │   │
-│  │  └──────────────────────────────────────────────────────────────────────┘    │   │
+│  │  ┌──────────────────────────────────────────────────────────────────────┐     │   │
+│  │  │  MessagingCapability                                                 │     │   │
+│  │  │  NATSCommunicationPort  (nats://host:4222)  ← default                │     │   │
+│  │  │  RabbitMQCommunicationPort (amqp://host:5672) ← optional             │     │   │
+│  │  │  DLQPort → DLQStore (SQLite │ Redis)                                 │     │   │
+│  │  │  RetryPolicy: 3 attempts, exponential backoff                        │     │   │
+│  │  └──────────────────────────────────────────────────────────────────────┘     │   │
 │  │                                                                               │   │
-│  │  ┌──────────────────────────────────────────────────────────────────────┐    │   │
-│  │  │  CommunicationAdapterCapability                                       │    │   │
-│  │  │  ChannelRegistry │ MessageBridge                                      │    │   │
-│  │  │  TelegramAdapter │ WhatsAppAdapter │ SignalAdapter                    │    │   │
-│  │  │  MessengerAdapter │ SlackAdapter │ [COMM_ADAPTER_PLUGIN]              │    │   │
-│  │  └──────────────────────────────────────────────────────────────────────┘    │   │
+│  │  ┌──────────────────────────────────────────────────────────────────────┐     │   │
+│  │  │  CommunicationAdapterCapability                                      │     │   │
+│  │  │  ChannelRegistry │ MessageBridge                                     │     │   │
+│  │  │  TelegramAdapter │ WhatsAppAdapter │ SignalAdapter                   │     │   │
+│  │  │  MessengerAdapter │ SlackAdapter │ [COMM_ADAPTER_PLUGIN]             │     │   │
+│  │  └──────────────────────────────────────────────────────────────────────┘     │   │
 │  │                                                                               │   │
-│  │  ┌──────────────────────────────────────────────────────────────────────┐    │   │
-│  │  │  PluginCapability  [MCP Server — port :47203]                        │    │   │
-│  │  │  OctopussyMCPServer (MCP 2025-11-25 Streamable HTTP)                 │    │   │
-│  │  │  PluginLoader │ PluginRegistry │ HotReloadEngine                     │    │   │
-│  │  │  MCPClientAdapter (outbound → external MCP servers)                  │    │   │
-│  │  └──────────────────────────────────────────────────────────────────────┘    │   │
+│  │  ┌──────────────────────────────────────────────────────────────────────┐     │   │
+│  │  │  PluginCapability  [MCP Server — port :47203]                        │     │   │
+│  │  │  OctopussyMCPServer (MCP 2025-11-25 Streamable HTTP)                 │     │   │
+│  │  │  PluginLoader │ PluginRegistry │ HotReloadEngine                     │     │   │
+│  │  │  MCPClientAdapter (outbound → external MCP servers)                  │     │   │
+│  │  └──────────────────────────────────────────────────────────────────────┘     │   │
 │  │                                                                               │   │
-│  │  ┌──────────────────────┐  ┌──────────────────────────────────────────────┐  │   │
-│  │  │  SpeechCapability    │  │  SpeechCapability (cont.)                    │  │   │
-│  │  │  STTEngine (Whisper) │  │  TTSEngine (Coqui/pyttsx3)                  │  │   │
-│  │  └──────────────────────┘  └──────────────────────────────────────────────┘  │   │
+│  │  ┌──────────────────────┐  ┌──────────────────────────────────────────────┐   │   │
+│  │  │  SpeechCapability    │  │  SpeechCapability (cont.)                    │   │   │
+│  │  │  STTEngine (Whisper) │  │  TTSEngine (Coqui/pyttsx3)                   │   │   │
+│  │  └──────────────────────┘  └──────────────────────────────────────────────┘   │   │
 │  └───────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                      │
 │  ┌───────────────────────────────────────────────────────────────────────────────┐   │
-│  │                       SECURITY &amp; SECRETS LAYER                                │   │
+│  │                       SECURITY &amp; SECRETS LAYER                            │   │
 │  │                                                                               │   │
-│  │  ┌──────────────────────────────────────────────────────────────────────┐    │   │
-│  │  │  SecurityCapability                                                   │    │   │
-│  │  │  AuthenticationEngine (JWT RS256 + TOTP for SUPERUSER/ADMIN)         │    │   │
-│  │  │  AuthorizationEngine (RBAC, deny-by-default, explicit allowlists)    │    │   │
-│  │  │  PromptInjectionScanner │ GuardrailEngine                            │    │   │
-│  │  │  AuditLogger (append-only JSONL — entries never deleted)             │    │   │
-│  │  └──────────────────────────────────────────────────────────────────────┘    │   │
+│  │  ┌──────────────────────────────────────────────────────────────────────┐     │   │
+│  │  │  SecurityCapability                                                  │     │   │
+│  │  │  AuthenticationEngine (JWT RS256 + TOTP for SUPERUSER/ADMIN)         │     │   │
+│  │  │  AuthorizationEngine (RBAC, deny-by-default, explicit allowlists)    │     │   │
+│  │  │  PromptInjectionScanner │ GuardrailEngine                            │     │   │
+│  │  │  AuditLogger (append-only JSONL — entries never deleted)             │     │   │
+│  │  └──────────────────────────────────────────────────────────────────────┘     │   │
 │  │                                                                               │   │
-│  │  ┌──────────────────────────────────────────────────────────────────────┐    │   │
-│  │  │  SecretsCapability                                                    │    │   │
-│  │  │  LocalEncryptedFileStore (AES-256-GCM) │ HashiCorpVaultAdapter       │    │   │
-│  │  │  AWSSecretsManagerAdapter │ AzureKeyVaultAdapter                     │    │   │
-│  │  │  No dependencies — always starts first                               │    │   │
-│  │  └──────────────────────────────────────────────────────────────────────┘    │   │
+│  │  ┌──────────────────────────────────────────────────────────────────────┐     │   │
+│  │  │  SecretsCapability                                                   │     │   │
+│  │  │  LocalEncryptedFileStore (AES-256-GCM) │ HashiCorpVaultAdapter       │     │   │
+│  │  │  AWSSecretsManagerAdapter │ AzureKeyVaultAdapter                     │     │   │
+│  │  │  No dependencies — always starts first                               │     │   │
+│  │  └──────────────────────────────────────────────────────────────────────┘     │   │
 │  └───────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                      │
 │  ┌───────────────────────────────────────────────────────────────────────────────┐   │
-│  │                     CONFIGURATION &amp; REGISTRY LAYER                            │   │
+│  │                     CONFIGURATION &amp; REGISTRY LAYER                        │   │
 │  │                                                                               │   │
-│  │  ┌──────────────────────────────────┐  ┌──────────────────────────────────┐  │   │
-│  │  │  ConfigurationCapability         │  │  OctopussyCapabilityRegistry      │  │   │
-│  │  │  FileWatcher (Observer pattern)  │  │  OctopussyCapabilityLifecycleMgr  │  │   │
-│  │  │  YAMLParser │ EnvOverrideEngine  │  │  (OCLM) — Kahn's algorithm       │  │   │
-│  │  │  /etc/octopussy/octopussy.yaml   │  │  6-phase lifecycle enforcement    │  │   │
-│  │  └──────────────────────────────────┘  └──────────────────────────────────┘  │   │
+│  │  ┌──────────────────────────────────┐  ┌──────────────────────────────────┐   │   │
+│  │  │  ConfigurationCapability         │  │  OctopussyCapabilityRegistry     │   │   │
+│  │  │  FileWatcher (Observer pattern)  │  │  OctopussyCapabilityLifecycleMgr │   │   │
+│  │  │  YAMLParser │ EnvOverrideEngine  │  │  (OCLM) — Kahn's algorithm       │   │   │
+│  │  │  /etc/octopussy/octopussy.yaml   │  │  6-phase lifecycle enforcement   │   │   │
+│  │  └──────────────────────────────────┘  └──────────────────────────────────┘   │   │
 │  └───────────────────────────────────────────────────────────────────────────────┘   │
 │                                                                                      │
 └──────────────────────────────────────────────────────────────────────────────────────┘
@@ -6120,13 +6120,13 @@ OCTOPUSSY PLATFORM
         │
         │  [RAGCapability — RAGPort]
         ├──────────────────────────────────────────────────────────────────────────────┐
-        │  ChromaDB (local file)  │  pgvector (PostgreSQL)  │  Weaviate               │
+        │  ChromaDB (local file)  │  pgvector (PostgreSQL)  │  Weaviate                │
         │  Qdrant                 │  Milvus                 │  [VECTOR_DB_PLUGIN]      │
         └──────────────────────────────────────────────────────────────────────────────┘
         │
         │  [GraphRAGCapability — GraphPort]
         ├──────────────────────────────────────────────────────────────────────────────┐
-        │  Neo4j (bolt://host:7687)  │  Memgraph  │  ArangoDB  │  [GRAPH_DB_PLUGIN]   │
+        │  Neo4j (bolt://host:7687)  │  Memgraph  │  ArangoDB  │  [GRAPH_DB_PLUGIN]    │
         └──────────────────────────────────────────────────────────────────────────────┘
         │
         │  [MessagingCapability — CommunicationPort]
@@ -6137,13 +6137,13 @@ OCTOPUSSY PLATFORM
         │
         │  [SecretsCapability — SecretsPort]
         ├──────────────────────────────────────────────────────────────────────────────┐
-        │  Local AES-256-GCM file  │  HashiCorp Vault  │  AWS Secrets Manager         │
-        │  Azure Key Vault                                                              │
+        │  Local AES-256-GCM file  │  HashiCorp Vault  │  AWS Secrets Manager          │
+        │  Azure Key Vault                                                             │
         └──────────────────────────────────────────────────────────────────────────────┘
         │
         │  [ObservabilityCapability — OTLP / Prometheus]
         ├──────────────────────────────────────────────────────────────────────────────┐
-        │  OTLP Collector (:4317)  →  Jaeger / Tempo / Grafana                        │
+        │  OTLP Collector (:4317)  →  Jaeger / Tempo / Grafana                         │
         │  Prometheus (:9090)      →  Grafana                                          │
         │  Audit JSONL file        →  SIEM / log aggregator                            │
         └──────────────────────────────────────────────────────────────────────────────┘
@@ -6203,18 +6203,18 @@ Shutdown: 26 → 1 (strict reverse topological order)
 
 B.5 Network Port Map (Normative)
 ┌──────────┬──────────────┬───────────────────────────────────────────────────────┐
-│  Port    │  Protocol    │  Purpose &amp; Capability                                  │
+│  Port    │  Protocol    │  Purpose &amp; Capability                             │
 ├──────────┼──────────────┼───────────────────────────────────────────────────────┤
-│  47200   │  HTTPS/REST  │  REST API — OrchestratorCapability (inbound)           │
-│  47201   │  gRPC/mTLS   │  gRPC API — OrchestratorCapability (inbound)           │
-│  47202   │  WSS         │  WebSocket — OrchestratorCapability + WebUICapability  │
-│  47203   │  HTTPS/MCP   │  MCP Server 2025-11-25 — PluginCapability (inbound)    │
-│   9090   │  HTTP        │  Prometheus metrics — ObservabilityCapability          │
-│   4222   │  NATS TCP    │  NATS.io message bus — MessagingCapability             │
-│   5672   │  AMQP        │  RabbitMQ (optional) — MessagingCapability             │
-│   4317   │  gRPC/OTLP   │  OpenTelemetry collector — ObservabilityCapability     │
-│   7687   │  Bolt        │  Neo4j graph DB — GraphRAGCapability (outbound)        │
-│  11434   │  HTTP        │  Ollama LLM server (outbound) — LLMRouterCapability    │
+│  47200   │  HTTPS/REST  │  REST API — OrchestratorCapability (inbound)          │
+│  47201   │  gRPC/mTLS   │  gRPC API — OrchestratorCapability (inbound)          │
+│  47202   │  WSS         │  WebSocket — OrchestratorCapability + WebUICapabilit  │
+│  47203   │  HTTPS/MCP   │  MCP Server 2025-11-25 — PluginCapability (inbound)   │
+│   9090   │  HTTP        │  Prometheus metrics — ObservabilityCapability         │
+│   4222   │  NATS TCP    │  NATS.io message bus — MessagingCapability            │
+│   5672   │  AMQP        │  RabbitMQ (optional) — MessagingCapability            │
+│   4317   │  gRPC/OTLP   │  OpenTelemetry collector — ObservabilityCapability    │
+│   7687   │  Bolt        │  Neo4j graph DB — GraphRAGCapability (outbound)       │
+│  11434   │  HTTP        │  Ollama LLM server (outbound) — LLMRouterCapability   │
 └──────────┴──────────────┴───────────────────────────────────────────────────────┘
 All inbound ports on 47200–47203 require TLS. mTLS enforced for server-to-server.
 All REST and WebSocket endpoints require JWT authentication.
@@ -6226,21 +6226,21 @@ Inbound Request
       │
       ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  TRANSPORT LAYER                                                 │
-│  mTLS verification (RESTCommunicationPort / GRPCCommunicationPort)│
+│  TRANSPORT LAYER                                                │
+│  mTLS verification (RESTCommunicationPort/GRPCCommunicationPort)│
 └──────────────────────────────┬──────────────────────────────────┘
                                │  PASS
                                ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  AUTHENTICATION LAYER (SecurityCapability)                       │
-│  JWT bearer token verification (RS256)                           │
+│  AUTHENTICATION LAYER (SecurityCapability)                      │
+│  JWT bearer token verification (RS256)                          │
 │  TOTP verification (SUPERUSER / ADMIN roles only)               │
 └──────────────────────────────┬──────────────────────────────────┘
                                │  PASS
                                ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  AUTHORIZATION LAYER (SecurityCapability)                        │
-│  RBAC deny-by-default: permission ∈ allowlist? → ALLOW : DENY  │
+│  AUTHORIZATION LAYER (SecurityCapability)                       │
+│  RBAC deny-by-default: permission ∈ allowlist? → ALLOW : DENY   │
 └──────────────────────────────┬──────────────────────────────────┘
                                │  ALLOW
                                ▼
@@ -6249,7 +6249,7 @@ Inbound Request
                                │
                                ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  MESSAGE LAYER (OctopussyAgent._message_loop())                  │
+│  MESSAGE LAYER (OctopussyAgent._message_loop())                 │
 │  verify_signature()  → DROP + AUDIT if invalid                  │
 │  is_expired()        → DROP + AUDIT if TTL exceeded             │
 │  scan_prompt()       → BLOCK + AUDIT if injection detected      │
@@ -6261,10 +6261,10 @@ Inbound Request
                                │
                                ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  TOOL EXECUTION LAYER (ToolRegistryCapability + SandboxCapability│
+│  TOOL EXECUTION LAYER (ToolRegistryCapability+SandboxCapability │
 │  tool_id ∈ allowed_tools? → ALLOW : ToolPermissionError         │
-│  SandboxCapability isolates execution (Bulkhead pattern)         │
-│  Network: explicit allowlist only (default: disabled)            │
+│  SandboxCapability isolates execution (Bulkhead pattern)        │
+│  Network: explicit allowlist only (default: disabled)           │
 └──────────────────────────────┬──────────────────────────────────┘
                                │  PASS
                                ▼
@@ -6272,7 +6272,7 @@ Inbound Request
                                │
                                ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  OUTPUT GUARDRAIL LAYER (SecurityCapability)                     │
+│  OUTPUT GUARDRAIL LAYER (SecurityCapability)                    │
 │  validate_output(output, policy) → BLOCK + AUDIT if violated    │
 │  HMAC-SHA256 signature applied to response OctopussyMessage     │
 └──────────────────────────────┬──────────────────────────────────┘

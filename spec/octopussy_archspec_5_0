@@ -1,0 +1,5074 @@
+Octopussy Architecture Specification &amp; Implementation Skeleton v5.0
+Corrected, Completed, Fully CCA 0.2–Compliant, with User-Agent Extension Framework
+
+Document Status: Production-Ready (v5.0 — All Issues Resolved)
+Version: 5.0.0
+Architecture: Capability-Centric Architecture (CCA) 0.2 by Michael Stal
+Python: 3.11+
+MCP Protocol: 2025-11-25 (Streamable HTTP Transport)
+Date: 2026-03-24
+
+TABLE OF CONTENTS
+
+Vision &amp; Positioning
+Architectural Foundations
+System-Level CCA Capability Map
+Core Capabilities — Detailed Specification
+4.0 CCA Foundation Types
+4.1 OrchestratorCapability
+4.2 AgentFactoryCapability
+4.3 ActorCapability (OctopussyAgent)
+4.4 TeamCapability
+4.5 LLMRouterCapability
+4.6 MemoryCapability
+4.7 RAGCapability &amp; GraphRAGCapability
+4.8 ToolRegistryCapability
+4.9 PluginCapability
+4.10 MessagingCapability
+4.11 CommunicationAdapterCapability
+4.12 SecurityCapability
+4.13 SecretsCapability
+4.14 SchedulerCapability
+4.15 ObservabilityCapability (Sidecar)
+4.16 PromptEngineCapability
+4.17 UserSessionCapability
+4.18 WebUICapability
+4.19 CLICapability
+4.20 SpeechCapability
+4.21 SandboxCapability
+4.22 TokenBudgetCapability
+4.23 CritiqueCapability
+4.24 AgentLifecycleManagerCapability
+4.25 ConfigurationCapability
+4.26 UserAgentExtensionCapability (new in v5.0)
+
+
+Built-in Tools Catalogue
+Actor Model &amp; Agent Architecture
+Team Patterns &amp; Multi-Agent Architecture
+Messaging Architecture
+LLM/VLM Port Architecture
+Security Architecture
+MCP Integration Architecture (2025-11-25)
+Deployment Architecture
+Configuration File Schema
+Plugin Architecture
+Design Patterns Reference Matrix
+Quality Attribute Realization
+Implementation Skeleton
+Evolution &amp; Versioning Policy
+Appendix A: Open Source Stack
+
+
+1. VISION &amp; POSITIONING
+1.1 What Is Octopussy?
+Octopussy is a production-grade, open-source, agentic AI platform built entirely on Capability-Centric Architecture (CCA) 0.2 by Michael Stal. It enables individuals, teams, and organizations to deploy autonomous AI agents — individually or in coordinated multi-agent teams — across any platform: macOS, Windows, Linux, single-board computers (Raspberry Pi, Jetson Nano), Docker containers, and Kubernetes clusters.
+Octopussy is the operating system for autonomous AI agents: it handles agent lifecycle, LLM routing, memory, RAG, security, sandboxing, token budgets, scheduling, multi-agent coordination, observability, and extensibility — so developers focus exclusively on agent goals and behaviors.
+Installation is intentionally frictionless:
+pip install octopussy
+octopussy install
+octopussy start
+octopussy status
+
+1.2 Core Design Principles
+
+
+
+#
+Principle
+Enforcement
+
+
+
+P1
+CCA-first — Every functional unit is a Capability. No exceptions.
+CapabilityRegistry rejects non-Capability registrations
+
+
+P2
+Zero-trust by default — Every message signed, every call authenticated and authorized.
+HMAC signature is bytes, never Optional[bytes]; verification raises on failure
+
+
+P3
+Async everywhere — No blocking I/O anywhere in the system.
+All lifecycle and agent methods are async def; asyncio.run_in_executor for unavoidable sync calls
+
+
+P4
+Immutable messages — All inter-agent communication via frozen dataclass messages.
+OctopussyMessage is frozen=True; mutations raise FrozenInstanceError
+
+
+P5
+Deny-by-default security — Least privilege enforced at every layer.
+Permissions are explicit allowlists; absence of permission = denial
+
+
+P6
+Pluggable everything — LLMs, vector DBs, graph DBs, tools, communication adapters, user agents — all pluggable at runtime.
+Plugin hot-reload via PluginCapability.hot_reload_plugin(); user agents via UserAgentExtensionCapability
+
+
+P7
+Observable by design — Full metrics, traces, and logs via OpenTelemetry sidecar.
+Every Capability receives ObservabilityPort via DI; sidecar starts before all others
+
+
+P8
+User-extensible agents — Users can register, load, and run their own custom agent classes without modifying core code.
+UserAgentExtensionCapability provides the UserAgentRegistryPort; AgentFactoryCapability delegates to it for unknown agent types
+
+
+1.3 Competitive Positioning
+
+
+
+Dimension
+OpenClaw
+Octopussy 5.0
+
+
+
+Architecture
+Layered monolith
+CCA 0.2: Nucleus/Contract/Envelope
+
+
+Agent Model
+Static agents
+Dynamic Actor model with AgentFactory + user-extensible agents
+
+
+Installation
+Complex, multi-step
+pip install octopussy &amp;&amp; octopussy install
+
+
+Agent Creation
+Code-first
+Configuration-first (Markdown files) or code-first (user agents)
+
+
+LLM Support
+Limited
+All local+cloud, GPU-aware, fallback chains
+
+
+Security
+Basic
+Zero-trust, sandboxed, secrets store, guardrails
+
+
+Multi-Agent
+Limited patterns
+Pipeline, Coordinator/Worker, Mesh+Blackboard, Tree
+
+
+Messaging
+Synchronous REST
+Full async Actor queues + gRPC + NATS event bus
+
+
+Observability
+Minimal
+Sidecar pattern, full metrics/traces/logs (OpenTelemetry)
+
+
+Token Budget
+None
+Per-agent, multi-period, cost-aware
+
+
+MCP
+None
+Full MCP 2025-11-25 (Streamable HTTP), server + client
+
+
+Platforms
+Linux only
+macOS, Windows, Linux, SBCs, Docker, Kubernetes
+
+
+Extensibility
+Hard-coded
+Full plugin architecture + user agent extension framework
+
+
+
+2. ARCHITECTURAL FOUNDATIONS
+2.1 Capability-Centric Architecture (CCA 0.2) Application
+Every functional unit of Octopussy is a Capability structured according to CCA 0.2 by Michael Stal.
+CCA 0.2 Terminology Clarification (Normative)
+
+Provisions — the interfaces a Capability provides to other Capabilities (its public API; the services it offers to the outside world). A Capability exposes one or more interfaces as its Provisions.
+Requirements — the interfaces a Capability needs from other Capabilities (its dependencies). These interface references are injected into the Capability by the OCLM via inject_dependency(). The Requirements are the set of interfaces the Capability consumes from other Capabilities.
+Protocols — the interaction rules, ordering constraints, invariants, and messaging/transport standards used by the Capability (e.g., NATS.io pub/sub, REST over HTTPS, gRPC over mTLS, RabbitMQ AMQP, MCP 2025-11-25 Streamable HTTP). Protocols describe both behavioral contracts and wire-level communication standards.
+
+Capability Nucleus
+Three mandatory layers, present in every Capability:
+
+Essence — pure domain logic; no infrastructure, no I/O, no external dependencies
+Realization — technical mechanisms: database adapters, queue implementations, HTTP clients
+Adaptation — external interfaces: REST adapters, gRPC adapters, CLI adapters, MCP adapters
+
+Capability Contract
+Formal specification of every Capability's interface:
+
+Provisions — what the Capability provides to others (its public interface; the interfaces it offers)
+Requirements — what the Capability needs from others (the interfaces it consumes from other Capabilities; injected via inject_dependency())
+Protocols — interaction rules, ordering constraints, invariants, and messaging/transport standards
+
+Capability Instance
+A Capability Instance is a fully initialized, running, configured instantiation of a Capability. Each Capability Instance:
+
+Is created exactly once by CapabilityFactory
+Is registered under a unique name in the OctopussyCapabilityRegistry
+Passes through all six CCA lifecycle phases: instantiate → initialize() → inject_dependency() → start() → [runtime] → stop() → cleanup()
+Is never shared across system boundaries; each deployment has its own set of instances
+Carries its own Evolution Envelope declaring its version, minimum client version, deprecation policy, and migration guide
+
+inject_dependency() — CCA Lifecycle Phase 3 (Normative)
+The OCLM calls inject_dependency() on every Capability after initialize() and before start(). During this phase, the OCLM resolves all interfaces declared as Requirements in the Capability's Contract and injects the concrete references into the Capability instance. This is the exclusive mechanism by which Capabilities obtain references to other Capabilities' ports. No Capability may obtain a reference to another Capability's port by any other means (no service locator, no global registry lookup at runtime).
+Evolution Envelope
+Every Capability carries an Evolution Envelope:
+
+Semantic versioning (MAJOR.MINOR.PATCH)
+Deprecation policy (12 months notice before removal of any Contract method)
+Migration path (published before old version is removed)
+CAPABILITY_VERSION and MINIMUM_CLIENT_VERSION constants
+
+Capability Registry
+The OctopussyCapabilityRegistry is the authoritative catalogue of all Capability Instances in the system. It:
+
+Accepts registrations of Capability Instances with their dependency declarations
+Detects circular dependencies at registration time using Kahn's algorithm
+Rejects non-Capability registrations
+Provides topological_order() for startup sequencing
+Is itself a CCA element
+
+Capability Lifecycle Manager
+The OctopussyCapabilityLifecycleManager (OCLM) orchestrates all Capability Instances through the mandatory six-phase CCA lifecycle. It:
+
+Computes topologically sorted startup order using Kahn's algorithm
+Enforces the six-phase lifecycle on every Capability Instance without exception
+During inject_dependency(): resolves all Requirement interfaces and injects them into each Capability
+Shuts down in strict reverse topological order
+Is itself a CCA element
+
+2.2 Design Patterns Applied
+
+
+
+Category
+Patterns
+
+
+
+Behavioral
+Actor Model, State Machine, Chain of Responsibility, Template Method, Strategy, Observer, Command, Mediator
+
+
+Creational
+Abstract Factory, Builder, Prototype, Factory Method
+
+
+Resilience
+Circuit Breaker, Retry+Backoff, Bulkhead, Dead Letter Queue, Timeout
+
+
+Integration
+Adapter, Facade, Proxy, Decorator, Mediator
+
+
+Concurrency
+Async/Await, Priority Queue, Message Passing, Structured Concurrency
+
+
+Extensibility
+Plugin, Repository, Publish/Subscribe
+
+
+Agentic
+ReAct, Plan-and-Execute, Reflection, Critique-and-Revise, Blackboard
+
+
+2.3 Anti-Patterns Explicitly Avoided
+
+
+
+Anti-Pattern
+Mitigation
+
+
+
+God Object
+Every Capability has a single, expressible responsibility
+
+
+Circular Dependencies
+Detected at registration time; rejected by registry with CircularDependencyError
+
+
+Shared Mutable State
+All messages are frozen dataclasses; state owned by exactly one Capability
+
+
+Synchronous Blocking I/O
+All lifecycle and agent methods are async def; sync calls wrapped in asyncio.run_in_executor
+
+
+Magic Strings
+All constants are StrEnum / IntEnum with full IDE support
+
+
+Direct Instantiation
+All Capabilities created via CapabilityFactory
+
+
+Mutable Messages
+OctopussyMessage is frozen=True; mutations raise FrozenInstanceError
+
+
+Optional Security
+HMAC signatures mandatory (bytes, not Optional[bytes]); TOTP mandatory for elevated roles
+
+
+Swallowed Exceptions
+All exceptions logged with full trace context before re-raise or DLQ routing
+
+
+Implicit Ordering
+Startup order is explicit, computed, and validated before first initialize() call
+
+
+
+3. SYSTEM-LEVEL CCA CAPABILITY MAP
+OctopussySystem (v5.0.0)
+│
+├── SecretsCapability                  (Nucleus + Contract + Envelope v5.0)
+├── ConfigurationCapability            (Nucleus + Contract + Envelope v5.0)
+├── ObservabilityCapability            (Nucleus + Contract + Envelope v5.0) [Sidecar]
+├── SecurityCapability                 (Nucleus + Contract + Envelope v5.0)
+├── MessagingCapability                (Nucleus + Contract + Envelope v5.0)
+├── PluginCapability                   (Nucleus + Contract + Envelope v5.0)
+├── SandboxCapability                  (Nucleus + Contract + Envelope v5.0)
+├── ToolRegistryCapability             (Nucleus + Contract + Envelope v5.0)
+├── LLMRouterCapability                (Nucleus + Contract + Envelope v5.0)
+├── MemoryCapability                   (Nucleus + Contract + Envelope v5.0)
+├── RAGCapability                      (Nucleus + Contract + Envelope v5.0)
+├── GraphRAGCapability                 (Nucleus + Contract + Envelope v5.0)
+├── TokenBudgetCapability              (Nucleus + Contract + Envelope v5.0)
+├── PromptEngineCapability             (Nucleus + Contract + Envelope v5.0)
+├── UserAgentExtensionCapability       (Nucleus + Contract + Envelope v5.0) [NEW]
+├── ActorCapability                    (Nucleus + Contract + Envelope v5.0)
+├── AgentLifecycleManagerCapability    (Nucleus + Contract + Envelope v5.0)
+├── AgentFactoryCapability             (Nucleus + Contract + Envelope v5.0)
+├── CritiqueCapability                 (Nucleus + Contract + Envelope v5.0)
+├── SchedulerCapability                (Nucleus + Contract + Envelope v5.0)
+├── TeamCapability                     (Nucleus + Contract + Envelope v5.0)
+├── CommunicationAdapterCapability     (Nucleus + Contract + Envelope v5.0)
+├── UserSessionCapability              (Nucleus + Contract + Envelope v5.0)
+├── SpeechCapability                   (Nucleus + Contract + Envelope v5.0)
+├── OrchestratorCapability             (Nucleus + Contract + Envelope v5.0)
+├── CLICapability                      (Nucleus + Contract + Envelope v5.0)
+└── WebUICapability                    (Nucleus + Contract + Envelope v5.0)
+
+Startup order (topological, computed by Kahn's algorithm):
+SecretsCapability
+→ ConfigurationCapability
+→ ObservabilityCapability          [Sidecar — starts independently, never blocks]
+→ SecurityCapability
+→ MessagingCapability
+→ PluginCapability
+→ SandboxCapability
+→ ToolRegistryCapability
+→ LLMRouterCapability
+→ MemoryCapability
+→ RAGCapability
+→ GraphRAGCapability
+→ TokenBudgetCapability
+→ PromptEngineCapability
+→ UserAgentExtensionCapability     [NEW — must precede ActorCapability and AgentFactoryCapability]
+→ ActorCapability
+→ AgentLifecycleManagerCapability
+→ AgentFactoryCapability
+→ CritiqueCapability
+→ SchedulerCapability
+→ TeamCapability
+→ CommunicationAdapterCapability
+→ UserSessionCapability
+→ SpeechCapability
+→ OrchestratorCapability
+→ CLICapability
+→ WebUICapability
+
+Shutdown proceeds in strict reverse order.
+
+4. CORE CAPABILITIES — DETAILED SPECIFICATION
+4.0 CCA Foundation Types
+4.0.1 Core Domain Types (Enums)
+# octopussy/core/enums.py
+
+from __future__ import annotations
+from enum import IntEnum, StrEnum
+
+
+class AgentType(StrEnum):
+    STATELESS_ONE_SHOT    = "STATELESS_ONE_SHOT"
+    STATEFUL_LOOP         = "STATEFUL_LOOP"
+    SCHEDULED_TASK_DAEMON = "SCHEDULED_TASK_DAEMON"
+    USER_DEFINED          = "USER_DEFINED"   # v5.0: user-registered agent types
+
+
+class AgentState(StrEnum):
+    CREATED    = "CREATED"
+    IDLE       = "IDLE"
+    PROCESSING = "PROCESSING"
+    PAUSED     = "PAUSED"
+    STOPPING   = "STOPPING"
+    STOPPED    = "STOPPED"
+    ERROR      = "ERROR"
+
+
+class ExecutionMode(StrEnum):
+    SOLO  = "SOLO"
+    TEAM  = "TEAM"
+
+
+class MessageType(StrEnum):
+    TASK    = "TASK"
+    RESULT  = "RESULT"
+    CONTROL = "CONTROL"
+    EVENT   = "EVENT"
+
+
+class MessagePriority(IntEnum):
+    CRITICAL = 0
+    HIGH     = 1
+    NORMAL   = 2
+    LOW      = 3
+
+
+class LLMRoutingStrategy(StrEnum):
+    COST     = "COST"
+    QUALITY  = "QUALITY"
+    BALANCED = "BALANCED"
+    LOCAL    = "LOCAL"
+    CLOUD    = "CLOUD"
+
+
+class SandboxBackend(StrEnum):
+    DOCKER        = "docker"
+    GVISOR        = "gvisor"
+    SECCOMP       = "seccomp"
+    MACOS_SANDBOX = "macos_sandbox"
+
+
+class CircuitBreakerState(StrEnum):
+    CLOSED    = "CLOSED"
+    OPEN      = "OPEN"
+    HALF_OPEN = "HALF_OPEN"
+
+
+class DeploymentProfile(StrEnum):
+    SBC        = "SBC"          # Raspberry Pi, Jetson Nano
+    LOCAL      = "LOCAL"        # Developer workstation
+    DOCKER     = "DOCKER"       # Docker Compose
+    KUBERNETES = "KUBERNETES"   # Production cluster
+
+
+class CommunicationProtocol(StrEnum):
+    NATS      = "NATS"
+    RABBITMQ  = "RABBITMQ"
+    REST      = "REST"
+    GRPC      = "GRPC"
+    MCP       = "MCP"
+    WEBSOCKET = "WEBSOCKET"
+
+
+class PluginType(StrEnum):
+    TOOL_PLUGIN             = "TOOL_PLUGIN"
+    LLM_ADAPTER_PLUGIN      = "LLM_ADAPTER_PLUGIN"
+    VLM_ADAPTER_PLUGIN      = "VLM_ADAPTER_PLUGIN"
+    COMM_ADAPTER_PLUGIN     = "COMM_ADAPTER_PLUGIN"
+    VECTOR_DB_PLUGIN        = "VECTOR_DB_PLUGIN"
+    GRAPH_DB_PLUGIN         = "GRAPH_DB_PLUGIN"
+    MCP_SERVER_PLUGIN       = "MCP_SERVER_PLUGIN"
+    INFERENCE_ENGINE_PLUGIN = "INFERENCE_ENGINE_PLUGIN"
+    PROMPT_PATTERN_PLUGIN   = "PROMPT_PATTERN_PLUGIN"
+    USER_AGENT_PLUGIN       = "USER_AGENT_PLUGIN"   # v5.0: user-defined agent class plugins
+
+4.0.2 OctopussyMessage
+# octopussy/core/message.py
+
+from __future__ import annotations
+import hmac
+import hashlib
+import time
+from dataclasses import dataclass
+from uuid import UUID, uuid4
+
+from octopussy.core.enums import MessagePriority, MessageType
+
+
+@dataclass(frozen=True, slots=True)
+class OctopussyMessage:
+    """
+    Immutable inter-agent message. All inter-agent communication uses this type exclusively.
+    Signature is mandatory (bytes, never Optional[bytes]).
+    payload must be a dict of JSON-serializable values only.
+    """
+    message_id:   UUID
+    sender_id:    UUID
+    recipient_id: UUID
+    message_type: MessageType
+    payload:      dict          # JSON-serializable values only; validated at create()
+    priority:     MessagePriority
+    trace_id:     UUID
+    created_at:   float         # Unix timestamp (UTC)
+    ttl_seconds:  int
+    signature:    bytes         # HMAC-SHA256; mandatory; never Optional
+
+    @staticmethod
+    def create(
+        sender_id:    UUID,
+        recipient_id: UUID,
+        message_type: MessageType,
+        payload:      dict,
+        secret:       bytes,
+        trace_id:     UUID | None = None,
+        priority:     MessagePriority = MessagePriority.NORMAL,
+        ttl_seconds:  int = 300,
+    ) -> "OctopussyMessage":
+        """
+        Factory method. Signs the message with HMAC-SHA256.
+        secret must be bytes (never str, never None).
+        payload must contain only JSON-serializable values.
+        """
+        if not isinstance(secret, bytes):
+            raise TypeError("secret must be bytes")
+        message_id = uuid4()
+        trace_id   = trace_id or uuid4()
+        created_at = time.time()
+        sig_data = (
+            f"{message_id}{sender_id}{recipient_id}{message_type}"
+            f"{created_at}{ttl_seconds}{priority}"
+        ).encode("utf-8")
+        signature = hmac.new(secret, sig_data, hashlib.sha256).digest()
+        return OctopussyMessage(
+            message_id   = message_id,
+            sender_id    = sender_id,
+            recipient_id = recipient_id,
+            message_type = message_type,
+            payload      = payload,
+            priority     = priority,
+            trace_id     = trace_id,
+            created_at   = created_at,
+            ttl_seconds  = ttl_seconds,
+            signature    = signature,
+        )
+
+    def verify_signature(self, secret: bytes) -> bool:
+        """
+        Constant-time HMAC-SHA256 verification.
+        secret must be bytes (never str, never None).
+        Returns False (never raises) so callers can log-and-drop.
+        """
+        if not isinstance(secret, bytes):
+            return False
+        sig_data = (
+            f"{self.message_id}{self.sender_id}{self.recipient_id}"
+            f"{self.message_type}{self.created_at}{self.ttl_seconds}{self.priority}"
+        ).encode("utf-8")
+        expected = hmac.new(secret, sig_data, hashlib.sha256).digest()
+        return hmac.compare_digest(self.signature, expected)
+
+    def is_expired(self) -> bool:
+        return time.time() > self.created_at + self.ttl_seconds
+
+4.0.3 Port Interfaces (Complete)
+# octopussy/core/ports/ports.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from uuid import UUID
+
+from octopussy.core.enums import AgentState
+
+
+class ObservabilityPort(ABC):
+    """
+    Provided by: ObservabilityCapability
+    Consumed by: every Capability (injected via inject_dependency())
+    """
+    @abstractmethod
+    def start_span(self, name: str, trace_id: UUID, attributes: dict) -> object: ...
+    @abstractmethod
+    def log(self, level: str, message: str, context: dict) -> None: ...
+    @abstractmethod
+    def metric(self, name: str, value: float, labels: dict) -> None: ...
+    @abstractmethod
+    def audit(self, event: str, actor: object, resource: str,
+              outcome: str, details: dict) -> None: ...
+
+
+class SecurityPort(ABC):
+    """
+    Provided by: SecurityCapability
+    Consumed by: AgentFactoryCapability, ActorCapability, ToolRegistryCapability,
+                 OrchestratorCapability, MessagingCapability, CommunicationAdapterCapability
+    """
+    @abstractmethod
+    async def authenticate(self, token: str) -> dict: ...
+    @abstractmethod
+    async def authorize(self, user_id: UUID, resource: str, action: str) -> bool: ...
+    @abstractmethod
+    async def scan_prompt(self, prompt: str) -> bool: ...
+    @abstractmethod
+    async def validate_output(self, output: str, policy: str) -> bool: ...
+    @abstractmethod
+    def audit(self, event: str, actor: object, resource: str,
+              outcome: str, details: dict) -> None: ...
+
+
+class TokenBudgetPort(ABC):
+    """
+    Provided by: TokenBudgetCapability
+    Consumed by: ActorCapability, AgentFactoryCapability
+    """
+    @abstractmethod
+    async def check_budget(self, agent_id: UUID, period: str) -> bool: ...
+    @abstractmethod
+    async def record_usage(self, agent_id: UUID,
+                           input_tokens: int, output_tokens: int) -> None: ...
+    @abstractmethod
+    async def get_usage_report(self, agent_id: UUID) -> dict: ...
+
+
+class AgentLifecyclePort(ABC):
+    """
+    Provided by: AgentLifecycleManagerCapability
+    Consumed by: ActorCapability, AgentFactoryCapability, OrchestratorCapability
+    """
+    @abstractmethod
+    async def register_agent(self, agent_id: UUID, name: str) -> None: ...
+    @abstractmethod
+    async def transition_state(self, agent_id: UUID, new_state: AgentState) -> None: ...
+    @abstractmethod
+    async def get_state(self, agent_id: UUID) -> AgentState: ...
+    @abstractmethod
+    async def record_heartbeat(self, agent_id: UUID) -> None: ...
+    @abstractmethod
+    async def deregister_agent(self, agent_id: UUID) -> None: ...
+
+
+class ToolExecutorPort(ABC):
+    """
+    Provided by: ToolRegistryCapability
+    Consumed by: ActorCapability, AgentFactoryCapability
+    """
+    @abstractmethod
+    async def execute_tool(self, agent_id: UUID, tool_id: str, args: dict) -> dict: ...
+    @abstractmethod
+    async def list_tools(self) -> list[dict]: ...
+
+
+class SandboxPort(ABC):
+    """
+    Provided by: SandboxCapability
+    Consumed by: ToolRegistryCapability
+    """
+    @abstractmethod
+    async def provision(self, agent_id: UUID, spec: dict) -> str: ...
+    @abstractmethod
+    async def execute(self, agent_id: UUID,
+                      command: list[str], timeout_sec: int = 30) -> dict: ...
+    @abstractmethod
+    async def destroy(self, agent_id: UUID) -> None: ...
+
+
+class MemoryPort(ABC):
+    """
+    Provided by: MemoryCapability
+    Consumed by: ActorCapability, AgentFactoryCapability, RAGCapability, TeamCapability
+    """
+    @abstractmethod
+    async def store(self, agent_id: UUID, key: str, value: str) -> None: ...
+    @abstractmethod
+    async def retrieve(self, agent_id: UUID, key: str) -> str | None: ...
+    @abstractmethod
+    async def search(self, agent_id: UUID, query: str, top_k: int = 5) -> list[dict]: ...
+    @abstractmethod
+    async def delete(self, agent_id: UUID, key: str) -> None: ...
+    @abstractmethod
+    async def clear(self, agent_id: UUID) -> None: ...
+
+
+class ConfigurationPort(ABC):
+    """
+    Provided by: ConfigurationCapability
+    Consumed by: most Capabilities
+    """
+    @abstractmethod
+    async def get(self, key: str, default: object = None) -> object: ...
+    @abstractmethod
+    async def get_section(self, section: str) -> dict: ...
+    @abstractmethod
+    async def reload(self) -> None: ...
+
+
+class SecretsPort(ABC):
+    """
+    Provided by: SecretsCapability
+    Consumed by: ConfigurationCapability, SecurityCapability, LLMRouterCapability,
+                 GraphRAGCapability, ObservabilityCapability
+    """
+    @abstractmethod
+    async def get_secret(self, name: str) -> str: ...
+    @abstractmethod
+    async def set_secret(self, name: str, value: str) -> None: ...
+    @abstractmethod
+    async def rotate_secret(self, name: str) -> str: ...
+    @abstractmethod
+    async def delete_secret(self, name: str) -> None: ...
+
+
+class UserAgentRegistryPort(ABC):
+    """
+    Provided by: UserAgentExtensionCapability
+    Consumed by: AgentFactoryCapability, ActorCapability
+
+    This is the interface through which user-created agent classes are registered
+    and resolved at runtime. Users register a subclass of OctopussyAgent under a
+    unique agent_type string. AgentFactoryCapability calls resolve_agent_class()
+    when it encounters an AgentType.USER_DEFINED agent spec.
+    """
+    @abstractmethod
+    async def register_agent_class(
+        self,
+        agent_type: str,
+        agent_class: type,
+        description: str = "",
+        schema_version: str = "5.0",
+    ) -> None:
+        """
+        Register a user-defined OctopussyAgent subclass under agent_type.
+        Raises UserAgentRegistrationError if agent_class does not subclass OctopussyAgent,
+        or if agent_type is already registered.
+        """
+        ...
+
+    @abstractmethod
+    async def resolve_agent_class(self, agent_type: str) -> type:
+        """
+        Resolve a registered agent class by agent_type string.
+        Raises UserAgentNotFoundError if agent_type is not registered.
+        """
+        ...
+
+    @abstractmethod
+    async def unregister_agent_class(self, agent_type: str) -> None:
+        """Unregister a user-defined agent class. Running instances are not affected."""
+        ...
+
+    @abstractmethod
+    async def list_registered_agents(self) -> list[dict]:
+        """List all registered user-defined agent classes with metadata."""
+        ...
+
+4.0.4 LLM Ports &amp; VLM Ports (Complete — All Providers)
+# octopussy/core/ports/llm_ports.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True, slots=True)
+class LLMRequest:
+    """Immutable LLM request."""
+    messages:    tuple[dict, ...]
+    model:       str
+    temperature: float = 0.7
+    max_tokens:  int   = 4096
+    system:      str   = ""
+    trace_id:    str   = ""
+
+
+@dataclass(frozen=True, slots=True)
+class LLMCompletion:
+    """Immutable LLM completion."""
+    content:       str
+    model:         str
+    input_tokens:  int
+    output_tokens: int
+    finish_reason: str
+
+
+class LLMPort(ABC):
+    """
+    Abstract base for all LLM provider ports.
+    Provided by: LLMRouterCapability (resolved per AgentSpec.intelligence)
+    Consumed by: ActorCapability, CritiqueCapability
+    """
+    @abstractmethod
+    async def complete(self, request: LLMRequest) -> LLMCompletion: ...
+    @abstractmethod
+    async def health_check(self) -> bool: ...
+
+
+# ── Local providers ──────────────────────────────────────────────────────────
+
+class OllamaLLMPort(LLMPort):
+    """Protocol: REST over HTTP (localhost only). Endpoint: http://localhost:11434"""
+    async def complete(self, request: LLMRequest) -> LLMCompletion: ...
+    async def health_check(self) -> bool: ...
+
+class LMStudioLLMPort(LLMPort):
+    """Protocol: REST over HTTP (localhost only). Endpoint: http://localhost:1234"""
+    async def complete(self, request: LLMRequest) -> LLMCompletion: ...
+    async def health_check(self) -> bool: ...
+
+class VLLMLLMPort(LLMPort):
+    """Protocol: REST over HTTP (localhost only). Endpoint: http://localhost:8000"""
+    async def complete(self, request: LLMRequest) -> LLMCompletion: ...
+    async def health_check(self) -> bool: ...
+
+class SGLangLLMPort(LLMPort):
+    """Protocol: REST over HTTP (localhost only). Endpoint: http://localhost:30000"""
+    async def complete(self, request: LLMRequest) -> LLMCompletion: ...
+    async def health_check(self) -> bool: ...
+
+class HuggingFaceTransformersLLMPort(LLMPort):
+    """Protocol: In-process (asyncio.run_in_executor). GPU-aware."""
+    async def complete(self, request: LLMRequest) -> LLMCompletion: ...
+    async def health_check(self) -> bool: ...
+
+class MLXLLMPort(LLMPort):
+    """Protocol: In-process (asyncio.run_in_executor). Apple Silicon only."""
+    async def complete(self, request: LLMRequest) -> LLMCompletion: ...
+    async def health_check(self) -> bool: ...
+
+# ── Cloud providers ───────────────────────────────────────────────────────────
+
+class OpenAILLMPort(LLMPort):
+    """Protocol: REST over HTTPS. API key from SecretsCapability."""
+    async def complete(self, request: LLMRequest) -> LLMCompletion: ...
+    async def health_check(self) -> bool: ...
+
+class AnthropicLLMPort(LLMPort):
+    """Protocol: REST over HTTPS. API key from SecretsCapability."""
+    async def complete(self, request: LLMRequest) -> LLMCompletion: ...
+    async def health_check(self) -> bool: ...
+
+class GoogleGeminiLLMPort(LLMPort):
+    """Protocol: REST over HTTPS. API key from SecretsCapability."""
+    async def complete(self, request: LLMRequest) -> LLMCompletion: ...
+    async def health_check(self) -> bool: ...
+
+class AWSBedrockLLMPort(LLMPort):
+    """Protocol: AWS SDK over HTTPS. Credentials from SecretsCapability."""
+    async def complete(self, request: LLMRequest) -> LLMCompletion: ...
+    async def health_check(self) -> bool: ...
+
+class AzureOpenAILLMPort(LLMPort):
+    """Protocol: REST over HTTPS. API key from SecretsCapability."""
+    async def complete(self, request: LLMRequest) -> LLMCompletion: ...
+    async def health_check(self) -> bool: ...
+
+
+class VLMPort(ABC):
+    """
+    Abstract base for all VLM provider ports.
+    Provided by: LLMRouterCapability (resolved per AgentSpec.intelligence, if vlm_enabled)
+    Consumed by: ActorCapability
+    """
+    @abstractmethod
+    async def complete_vision(self, request: LLMRequest,
+                              image_bytes: bytes) -> LLMCompletion: ...
+    @abstractmethod
+    async def health_check(self) -> bool: ...
+
+
+class OllamaVLMPort(VLMPort):
+    async def complete_vision(self, request: LLMRequest, image_bytes: bytes) -> LLMCompletion: ...
+    async def health_check(self) -> bool: ...
+
+class LMStudioVLMPort(VLMPort):
+    async def complete_vision(self, request: LLMRequest, image_bytes: bytes) -> LLMCompletion: ...
+    async def health_check(self) -> bool: ...
+
+class VLLMVLMPort(VLMPort):
+    async def complete_vision(self, request: LLMRequest, image_bytes: bytes) -> LLMCompletion: ...
+    async def health_check(self) -> bool: ...
+
+class HuggingFaceTransformersVLMPort(VLMPort):
+    async def complete_vision(self, request: LLMRequest, image_bytes: bytes) -> LLMCompletion: ...
+    async def health_check(self) -> bool: ...
+
+class MLXVLMPort(VLMPort):
+    async def complete_vision(self, request: LLMRequest, image_bytes: bytes) -> LLMCompletion: ...
+    async def health_check(self) -> bool: ...
+
+class OpenAIVLMPort(VLMPort):
+    async def complete_vision(self, request: LLMRequest, image_bytes: bytes) -> LLMCompletion: ...
+    async def health_check(self) -> bool: ...
+
+class AnthropicVLMPort(VLMPort):
+    async def complete_vision(self, request: LLMRequest, image_bytes: bytes) -> LLMCompletion: ...
+    async def health_check(self) -> bool: ...
+
+class GoogleGeminiVLMPort(VLMPort):
+    async def complete_vision(self, request: LLMRequest, image_bytes: bytes) -> LLMCompletion: ...
+    async def health_check(self) -> bool: ...
+
+class AWSBedrockVLMPort(VLMPort):
+    async def complete_vision(self, request: LLMRequest, image_bytes: bytes) -> LLMCompletion: ...
+    async def health_check(self) -> bool: ...
+
+class AzureOpenAIVLMPort(VLMPort):
+    async def complete_vision(self, request: LLMRequest, image_bytes: bytes) -> LLMCompletion: ...
+    async def health_check(self) -> bool: ...
+
+4.0.5 RAG Ports &amp; Graph Ports (Complete)
+# octopussy/core/ports/rag_ports.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from uuid import UUID
+
+
+class RAGPort(ABC):
+    """
+    Provided by: RAGCapability
+    Consumed by: ActorCapability, AgentFactoryCapability
+    """
+    @abstractmethod
+    async def ingest(self, collection_name: str,
+                     documents: list[str], metadata: list[dict]) -> int: ...
+    @abstractmethod
+    async def retrieve(self, collection_name: str,
+                       query: str, top_k: int = 5) -> list[dict]: ...
+    @abstractmethod
+    async def delete_collection(self, collection_name: str) -> None: ...
+
+
+class ChromaDBRAGPort(RAGPort):
+    """Default. Protocol: REST over HTTP (localhost). chromadb client."""
+    async def ingest(self, collection_name, documents, metadata): ...
+    async def retrieve(self, collection_name, query, top_k=5): ...
+    async def delete_collection(self, collection_name): ...
+
+class PGVectorRAGPort(RAGPort):
+    """Protocol: PostgreSQL wire protocol. asyncpg client."""
+    async def ingest(self, collection_name, documents, metadata): ...
+    async def retrieve(self, collection_name, query, top_k=5): ...
+    async def delete_collection(self, collection_name): ...
+
+class WeaviateRAGPort(RAGPort):
+    """Protocol: REST over HTTPS. weaviate-client."""
+    async def ingest(self, collection_name, documents, metadata): ...
+    async def retrieve(self, collection_name, query, top_k=5): ...
+    async def delete_collection(self, collection_name): ...
+
+class QdrantRAGPort(RAGPort):
+    """Protocol: REST over HTTPS or gRPC. qdrant-client."""
+    async def ingest(self, collection_name, documents, metadata): ...
+    async def retrieve(self, collection_name, query, top_k=5): ...
+    async def delete_collection(self, collection_name): ...
+
+class MilvusRAGPort(RAGPort):
+    """Protocol: gRPC. pymilvus client."""
+    async def ingest(self, collection_name, documents, metadata): ...
+    async def retrieve(self, collection_name, query, top_k=5): ...
+    async def delete_collection(self, collection_name): ...
+
+class VectorDBPluginRAGPort(RAGPort):
+    """Delegates to a VECTOR_DB_PLUGIN loaded by PluginCapability."""
+    async def ingest(self, collection_name, documents, metadata): ...
+    async def retrieve(self, collection_name, query, top_k=5): ...
+    async def delete_collection(self, collection_name): ...
+
+# octopussy/core/ports/graph_ports.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+
+
+class GraphPort(ABC):
+    """
+    Provided by: GraphRAGCapability
+    Consumed by: ActorCapability, AgentFactoryCapability
+    """
+    @abstractmethod
+    async def query(self, cypher: str, parameters: dict | None = None) -> list[dict]: ...
+    @abstractmethod
+    async def upsert_node(self, label: str, properties: dict) -> str: ...
+    @abstractmethod
+    async def upsert_edge(self, from_id: str, to_id: str,
+                          relation: str, properties: dict | None = None) -> None: ...
+    @abstractmethod
+    async def delete_node(self, node_id: str) -> None: ...
+
+
+class Neo4jGraphPort(GraphPort):
+    """Default. Protocol: Bolt over TCP (bolt://host:7687). neo4j driver."""
+    async def query(self, cypher, parameters=None): ...
+    async def upsert_node(self, label, properties): ...
+    async def upsert_edge(self, from_id, to_id, relation, properties=None): ...
+    async def delete_node(self, node_id): ...
+
+class ArangoDBGraphPort(GraphPort):
+    """Protocol: REST over HTTPS. python-arango client."""
+    async def query(self, cypher, parameters=None): ...
+    async def upsert_node(self, label, properties): ...
+    async def upsert_edge(self, from_id, to_id, relation, properties=None): ...
+    async def delete_node(self, node_id): ...
+
+class TigerGraphPort(GraphPort):
+    """Protocol: REST over HTTPS. pyTigerGraph client."""
+    async def query(self, cypher, parameters=None): ...
+    async def upsert_node(self, label, properties): ...
+    async def upsert_edge(self, from_id, to_id, relation, properties=None): ...
+    async def delete_node(self, node_id): ...
+
+class GraphDBPluginGraphPort(GraphPort):
+    """Delegates to a GRAPH_DB_PLUGIN loaded by PluginCapability."""
+    async def query(self, cypher, parameters=None): ...
+    async def upsert_node(self, label, properties): ...
+    async def upsert_edge(self, from_id, to_id, relation, properties=None): ...
+    async def delete_node(self, node_id): ...
+
+4.0.6 Communication Ports (Complete)
+# octopussy/core/ports/communication_ports.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from typing import Callable, Awaitable
+
+from octopussy.core.message import OctopussyMessage
+
+
+class CommunicationPort(ABC):
+    """
+    Abstract base for all inter-system communication protocol ports.
+    Protocols include both behavioral contracts and wire-level transport standards.
+    """
+    @abstractmethod
+    async def send(self, destination: str, message: OctopussyMessage) -> None:
+        """Send a message to the given destination."""
+        ...
+
+    @abstractmethod
+    async def receive(
+        self,
+        source: str,
+        handler: Callable[[OctopussyMessage], Awaitable[None]],
+    ) -> None:
+        """Subscribe to messages from source; invoke handler for each received message."""
+        ...
+
+    @abstractmethod
+    async def connect(self) -> None:
+        """Establish the connection to the transport backend."""
+        ...
+
+    @abstractmethod
+    async def disconnect(self) -> None:
+        """Gracefully close the connection to the transport backend."""
+        ...
+
+
+class NATSCommunicationPort(CommunicationPort):
+    """
+    Protocol: NATS wire protocol over TCP (nats://host:4222).
+    Supports subject-based routing, queue groups, and JetStream persistence.
+    Provided by: MessagingCapability (default backend).
+    """
+    async def send(self, destination, message): ...
+    async def receive(self, source, handler): ...
+    async def connect(self): ...
+    async def disconnect(self): ...
+
+
+class RabbitMQCommunicationPort(CommunicationPort):
+    """
+    Protocol: AMQP 0-9-1 over TCP (amqp://host:5672 or amqps://host:5671 with TLS).
+    Credentials injected via SecretsCapability.
+    Provided by: MessagingCapability (optional backend).
+    """
+    async def send(self, destination, message): ...
+    async def receive(self, source, handler): ...
+    async def connect(self): ...
+    async def disconnect(self): ...
+
+
+class InMemoryCommunicationPort(CommunicationPort):
+    """
+    Protocol: In-process asyncio queues. Single-node deployments only.
+    Provided by: MessagingCapability (in-memory backend).
+    """
+    async def send(self, destination, message): ...
+    async def receive(self, source, handler): ...
+    async def connect(self): ...
+    async def disconnect(self): ...
+
+
+class RESTCommunicationPort(CommunicationPort):
+    """
+    Protocol: REST over HTTPS (TLS). Port 47200.
+    Used by: OrchestratorCapability, CLICapability, WebUICapability.
+    Provided by: CommunicationAdapterCapability.
+    """
+    async def send(self, destination, message): ...
+    async def receive(self, source, handler): ...
+    async def connect(self): ...
+    async def disconnect(self): ...
+
+
+class GRPCCommunicationPort(CommunicationPort):
+    """
+    Protocol: gRPC over mTLS. Port 47201.
+    Provided by: CommunicationAdapterCapability.
+    """
+    async def send(self, destination, message): ...
+    async def receive(self, source, handler): ...
+    async def connect(self): ...
+    async def disconnect(self): ...
+
+
+class MCPCommunicationPort(CommunicationPort):
+    """
+    Protocol: MCP 2025-11-25 Streamable HTTP transport.
+    Validates MCP-Protocol-Version: 2025-11-25 header on all requests.
+    Provided by: PluginCapability (OctopussyMCPServer) and ToolRegistryCapability.
+    """
+    async def send(self, destination, message): ...
+    async def receive(self, source, handler): ...
+    async def connect(self): ...
+    async def disconnect(self): ...
+
+
+class WebSocketCommunicationPort(CommunicationPort):
+    """
+    Protocol: WSS (WebSocket over TLS). Port 47202.
+    Used by: WebUICapability for real-time dashboard updates.
+    Provided by: CommunicationAdapterCapability.
+    """
+    async def send(self, destination, message): ...
+    async def receive(self, source, handler): ...
+    async def connect(self): ...
+    async def disconnect(self): ...
+
+4.0.7 DLQ Port
+# octopussy/core/ports/dlq_port.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+
+from octopussy.core.message import OctopussyMessage
+
+
+class DLQPort(ABC):
+    """
+    Abstract base for the Dead Letter Queue port.
+    Provided by: MessagingCapability.
+    Consumed by: OrchestratorCapability (for CLI/REST DLQ management).
+    Stores all messages that could not be delivered after the maximum retry attempts.
+    All DLQ entries are persisted (SQLite by default) and are never silently discarded.
+    """
+
+    @abstractmethod
+    async def enqueue_failed(
+        self,
+        message: OctopussyMessage,
+        failure_reason: str,
+        attempt_count: int,
+    ) -> str:
+        """
+        Store a failed message in the DLQ.
+        Returns a unique dlq_entry_id.
+        Called automatically by MessagingCapability after 3 failed delivery attempts.
+        """
+        ...
+
+    @abstractmethod
+    async def list_entries(self, limit: int = 100) -> list[dict]:
+        """
+        List DLQ entries (most recent first).
+        Each entry: dlq_entry_id, message_id, sender_id, recipient_id,
+        failure_reason, attempt_count, failed_at (Unix timestamp), payload summary.
+        """
+        ...
+
+    @abstractmethod
+    async def get_entry(self, dlq_entry_id: str) -> dict:
+        """Retrieve a single DLQ entry by ID, including the full original message."""
+        ...
+
+    @abstractmethod
+    async def replay_entry(self, dlq_entry_id: str) -> None:
+        """Re-publish the original message. Removes from DLQ on successful re-delivery."""
+        ...
+
+    @abstractmethod
+    async def discard_entry(self, dlq_entry_id: str) -> None:
+        """Permanently discard a DLQ entry (operator decision). Irreversible."""
+        ...
+
+    @abstractmethod
+    async def get_size(self) -> int:
+        """Return the current number of entries in the DLQ."""
+        ...
+
+4.0.8 Agent Spec &amp; Related Dataclasses
+# octopussy/core/models/agent_spec.py
+
+from __future__ import annotations
+from dataclasses import dataclass, field
+from uuid import UUID
+
+from octopussy.core.enums import AgentType, ExecutionMode, LLMRoutingStrategy, SandboxBackend
+
+
+@dataclass(frozen=True, slots=True)
+class LLMIntelligenceSpec:
+    provider:         str                    # e.g. "ollama", "openai", "anthropic"
+    model:            str                    # e.g. "llama3.2", "gpt-4o", "claude-3-5-sonnet"
+    routing_strategy: LLMRoutingStrategy     = LLMRoutingStrategy.BALANCED
+    temperature:      float                  = 0.7
+    max_tokens:       int                    = 4096
+    fallback_provider: str | None            = None
+    fallback_model:    str | None            = None
+    vlm_enabled:       bool                  = False
+
+
+@dataclass(frozen=True, slots=True)
+class PermissionsSpec:
+    allowed_tools:    tuple[str, ...]        = field(default_factory=tuple)
+    forbidden_tools:  tuple[str, ...]        = field(default_factory=tuple)
+    allowed_paths:    tuple[str, ...]        = field(default_factory=tuple)
+    allowed_domains:  tuple[str, ...]        = field(default_factory=tuple)
+    max_iterations:   int                    = 10
+
+
+@dataclass(frozen=True, slots=True)
+class SandboxSpec:
+    backend:          SandboxBackend         = SandboxBackend.DOCKER
+    cpu_cores:        float                  = 1.0
+    memory_mb:        int                    = 512
+    disk_mb:          int                    = 1024
+    network_enabled:  bool                   = False
+
+
+@dataclass(frozen=True, slots=True)
+class TokenBudgetSpec:
+    hourly_limit:     int                    = 10_000
+    daily_limit:      int                    = 100_000
+    monthly_limit:    int                    = 1_000_000
+
+
+@dataclass(frozen=True, slots=True)
+class RAGSpec:
+    collection_name:  str
+    backend:          str                    = "chromadb"
+    top_k:            int                    = 5
+
+
+@dataclass(frozen=True, slots=True)
+class GraphRAGSpec:
+    graph_name:       str
+    hop_depth:        int                    = 2
+
+
+@dataclass(frozen=True, slots=True)
+class SchedulerSpec:
+    cron_expression:  str
+    timezone:         str                    = "UTC"
+
+
+@dataclass(frozen=True, slots=True)
+class MCPServerSpec:
+    """
+    Specification for an external MCP server (2025-11-25 protocol).
+    All tool calls to this server use MCP Streamable HTTP transport.
+    """
+    server_id:        str
+    endpoint_url:     str                    # e.g. "https://tools.example.com/mcp"
+    api_key_secret:   str | None             = None
+    protocol_version: str                    = "2025-11-25"
+    timeout_seconds:  int                    = 30
+    tool_name_prefix: str                    = ""
+
+
+@dataclass(frozen=True, slots=True)
+class AgentSpec:
+    """
+    Complete, immutable blueprint for an Octopussy agent.
+    Constructed by AgentFactoryCapability from configuration files.
+    All fields are validated before this object is created.
+    """
+    agent_id:         UUID
+    name:             str
+    description:      str
+    agent_type:       AgentType
+    execution_mode:   ExecutionMode
+    goal:             str
+    persona:          str
+    output_format:    str
+    intelligence:     LLMIntelligenceSpec
+    permissions:      PermissionsSpec
+    sandbox:          SandboxSpec
+    token_budget:     TokenBudgetSpec
+    rag:              RAGSpec | None          = None
+    graph_rag:        GraphRAGSpec | None     = None
+    scheduler:        SchedulerSpec | None    = None
+    mcp_servers:      tuple[MCPServerSpec, ...] = field(default_factory=tuple)
+    tags:             tuple[str, ...]         = field(default_factory=tuple)
+    # v5.0: for USER_DEFINED agents, this names the registered agent class
+    user_agent_type:  str | None              = None
+    schema_version:   str                     = "5.0"
+
+
+@dataclass(frozen=True, slots=True)
+class TeamSpec:
+    team_id:          UUID
+    name:             str
+    pattern:          str                    # coordinator | pipeline | mesh | tree
+    agent_ids:        tuple[UUID, ...]
+    result_synthesis: str                    = "coordinator"
+    max_rounds:       int                    = 3
+    timeout_seconds:  int                    = 600
+
+
+@dataclass(frozen=True, slots=True)
+class AgentHandle:
+    agent_id:         UUID
+    name:             str
+    agent_type:       AgentType
+
+
+@dataclass(frozen=True, slots=True)
+class TeamHandle:
+    team_id:          UUID
+    name:             str
+
+
+@dataclass(frozen=True, slots=True)
+class TaskHandle:
+    task_id:          UUID
+    agent_id:         UUID
+
+
+@dataclass(frozen=True, slots=True)
+class AgentInfo:
+    agent_id:         UUID
+    name:             str
+    agent_type:       AgentType
+    state:            str
+    spec:             AgentSpec
+
+
+4.1 OrchestratorCapability
+Purpose: The top-level coordinator for all agent and team operations. Exposes the primary REST API and routes CLI/WebUI requests to the appropriate Capabilities.
+OrchestratorCapability
+│
+├── Essence
+│   ├── TaskRouter             — routes tasks to best available agent
+│   ├── AgentGraphRenderer     — renders agent dependency graph (DOT/JSON/SVG)
+│   └── SystemStatusAggregator — aggregates health from all Capabilities
+│
+├── Realization
+│   ├── RESTAPIServer          — FastAPI server on port 47200
+│   └── TaskResultStore        — persists task results (SQLite)
+│
+└── Adaptation
+    └── OrchestratorAdapter    — implements OrchestratorContract
+
+# octopussy/capabilities/orchestrator/contract.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from uuid import UUID
+
+from octopussy.core.models.agent_spec import AgentHandle, AgentInfo, TaskHandle, TeamHandle
+
+
+class OrchestratorContract(ABC):
+    """
+    Provisions (interfaces this Capability provides to others):
+    - submit_task: submit a task to the best available agent
+    - submit_team_task: submit a task to a team
+    - create_agent: create a new agent from a config directory
+    - create_team: create a new team from a team spec
+    - get_agent_info: retrieve agent status and metadata
+    - list_agents: list all running agents
+    - get_task_result: retrieve the result of a submitted task
+    - get_system_status: retrieve system-wide health and metrics
+    - render_agent_graph: render the agent graph in the requested format
+
+    Requirements (interfaces this Capability consumes, injected via inject_dependency()):
+    - AgentFactoryCapability          → AgentFactoryContract
+    - AgentLifecycleManagerCapability → AgentLifecyclePort
+    - TeamCapability                  → TeamContract
+    - MessagingCapability             → MessagingContract
+    - SecurityCapability              → SecurityPort
+    - ObservabilityCapability         → ObservabilityPort
+
+    Protocols:
+    - REST API served on port 47200 over HTTPS (TLS).
+    - All REST endpoints require JWT authentication (SecurityCapability.authenticate()).
+    - RBAC enforced on all endpoints (SecurityCapability.authorize()).
+    - All task submissions result in a TaskHandle for async result retrieval.
+    - submit_task() selects the best available agent via TaskRouter.
+    - get_system_status() aggregates health from all registered Capabilities.
+    """
+
+    @abstractmethod
+    async def submit_task(
+        self, task: str, agent_id: UUID | None = None, priority: str = "NORMAL"
+    ) -> TaskHandle: ...
+
+    @abstractmethod
+    async def submit_team_task(
+        self, team_id: UUID, task: str, priority: str = "NORMAL"
+    ) -> TaskHandle: ...
+
+    @abstractmethod
+    async def create_agent(self, config_dir: str) -> AgentHandle: ...
+
+    @abstractmethod
+    async def create_team(self, team_config_dir: str) -> TeamHandle: ...
+
+    @abstractmethod
+    async def get_agent_info(self, agent_id: UUID) -> AgentInfo: ...
+
+    @abstractmethod
+    async def list_agents(self) -> list[AgentInfo]: ...
+
+    @abstractmethod
+    async def get_task_result(self, task_id: UUID) -> dict: ...
+
+    @abstractmethod
+    async def get_system_status(self) -> dict: ...
+
+    @abstractmethod
+    async def render_agent_graph(self, fmt: str = "dot") -> str: ...
+
+    @abstractmethod
+    async def inject_dependency(self) -> None:
+        """
+        CCA Lifecycle Phase 3: inject all required interface references.
+        Injects: AgentFactoryContract, AgentLifecyclePort, TeamContract,
+                 MessagingContract, SecurityPort, ObservabilityPort.
+        """
+        ...
+
+
+CAPABILITY_VERSION     = "5.0"
+MINIMUM_CLIENT_VERSION = "4.0"
+DEPRECATION_POLICY     = "12 months notice before removal of any Contract method"
+MIGRATION_GUIDE        = "docs/migration/orchestrator_5_0.md"
+
+
+4.2 AgentFactoryCapability
+Purpose: Creates, validates, and initializes agent instances from configuration directories. The sole factory for all agent creation, including user-defined agent types.
+AgentFactoryCapability
+│
+├── Essence
+│   ├── AgentSpecBuilder       — constructs AgentSpec from Markdown config files
+│   ├── AgentConfigValidator   — validates config schema before creation
+│   └── AgentInstantiator      — instantiates the correct OctopussyAgent subclass;
+│                                delegates to UserAgentRegistryPort for USER_DEFINED types
+│
+├── Realization
+│   ├── MarkdownConfigParser   — parses agent.md, persona.md, goal.md, permissions.md
+│   ├── JSONFileReader         — reads tool descriptors and MCP server specs
+│   ├── AgentSpecCache         — caches validated AgentSpec instances
+│   └── ConfigurationStore     — persists agent config references (SQLite)
+│
+└── Adaptation
+    └── AgentFactoryAdapter    — implements AgentFactoryContract
+
+# octopussy/capabilities/agent_factory/contract.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from uuid import UUID
+
+from octopussy.core.models.agent_spec import AgentHandle, AgentSpec
+
+
+class AgentFactoryContract(ABC):
+    """
+    Provisions (interfaces this Capability provides to others):
+    - create_agent_from_config: full agent creation from config directory
+    - validate_agent_config_dir: validation without creation (fail-fast)
+    - get_agent_spec: retrieve the AgentSpec for a running agent
+
+    Requirements (interfaces this Capability consumes, injected via inject_dependency()):
+    - ConfigurationCapability         → ConfigurationPort
+    - LLMRouterCapability             → LLMRouterContract
+    - MemoryCapability                → MemoryPort
+    - RAGCapability                   → RAGPort (ChromaDBRAGPort by default)
+    - GraphRAGCapability              → GraphPort (Neo4jGraphPort by default)
+    - ToolRegistryCapability          → ToolExecutorPort
+    - SandboxCapability               → SandboxPort
+    - TokenBudgetCapability           → TokenBudgetPort
+    - AgentLifecycleManagerCapability → AgentLifecyclePort
+    - SecurityCapability              → SecurityPort
+    - UserAgentExtensionCapability    → UserAgentRegistryPort
+    - ObservabilityCapability         → ObservabilityPort
+
+    Protocols:
+    - validate_agent_config_dir() MUST be called before create_agent_from_config().
+    - If validation returns any errors, create_agent_from_config() raises AgentConfigurationError.
+    - AgentSpec is immutable; no modification after creation.
+    - agent_id is always a fresh UUID4 generated during creation.
+    - For AgentType.USER_DEFINED agents, AgentInstantiator calls
+      UserAgentRegistryPort.resolve_agent_class(spec.user_agent_type) to obtain the class.
+    - All required interface references are injected by OCLM via inject_dependency().
+    """
+
+    @abstractmethod
+    async def create_agent_from_config(self, config_dir: str) -> AgentHandle: ...
+
+    @abstractmethod
+    async def validate_agent_config_dir(self, config_dir: str) -> list[str]: ...
+
+    @abstractmethod
+    async def get_agent_spec(self, agent_id: UUID) -> AgentSpec: ...
+
+    @abstractmethod
+    async def inject_dependency(self) -> None:
+        """
+        CCA Lifecycle Phase 3: inject all required interface references.
+        Called by OCLM after initialize() and before start().
+        """
+        ...
+
+
+CAPABILITY_VERSION     = "5.0"
+MINIMUM_CLIENT_VERSION = "4.0"
+DEPRECATION_POLICY     = "12 months notice before removal of any Contract method"
+MIGRATION_GUIDE        = "docs/migration/agent_factory_5_0.md"
+
+
+4.3 ActorCapability (OctopussyAgent)
+Purpose: Defines the abstract base class for all agents and the complete agent execution model.
+ActorCapability
+│
+├── Essence
+│   ├── OctopussyAgent (ABC)        — abstract base; all agents derive from this
+│   ├── AgentStateMachine           — manages agent state transitions
+│   ├── MessageDispatcher           — routes incoming messages to handlers
+│   ├── TokenBudgetMonitor          — tracks input/output token consumption
+│   ├── HeartbeatEmitter            — emits heartbeats on configured interval
+│   ├── LoopGuard                   — prevents infinite loops (iteration ceiling)
+│   ├── ConversationMemory          — short-term chat history per session
+│   └── ReflectionEngine            — self-reflection on outputs (ReAct pattern)
+│
+├── Realization
+│   ├── inQ (PriorityInboundQueue)  — asyncio.PriorityQueue, keyed by MessagePriority
+│   │                                  (CRITICAL=0 processed first → HIGH=1 → NORMAL=2 → LOW=3)
+│   ├── outQ (PriorityOutboundQueue)— asyncio.PriorityQueue, keyed by MessagePriority
+│   │                                  (CRITICAL=0 dispatched first → HIGH=1 → NORMAL=2 → LOW=3)
+│   ├── StateStore                  — persistent state (SQLite/Redis per config)
+│   ├── LLMPortAdapter              — wraps LLMPort with retry + circuit breaker
+│   ├── VLMPortAdapter              — wraps VLMPort with retry + circuit breaker
+│   └── MCPClientAdapter            — MCP 2025-11-25 Streamable HTTP client for tool calls
+│
+└── Adaptation
+    └── ActorAdapter                — implements ActorContract
+
+# octopussy/capabilities/actor/contract.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from uuid import UUID
+
+from octopussy.core.message import OctopussyMessage
+
+
+class ActorContract(ABC):
+    """
+    Provisions (interfaces this Capability provides to others):
+    - enqueue: enqueue an inbound message into inQ (asyncio.PriorityQueue)
+    - pause: pause message processing
+    - resume: resume message processing
+    - stop: initiate graceful shutdown
+
+    Requirements (interfaces this Capability consumes, injected via inject_dependency()):
+    - LLMRouterCapability             → LLMPort (resolved per AgentSpec.intelligence)
+    - LLMRouterCapability             → VLMPort (resolved per AgentSpec.intelligence, if vlm_enabled)
+    - MemoryCapability                → MemoryPort
+    - RAGCapability                   → RAGPort (ChromaDBRAGPort by default)
+    - GraphRAGCapability              → GraphPort (Neo4jGraphPort by default)
+    - ToolRegistryCapability          → ToolExecutorPort
+    - SandboxCapability               → SandboxPort
+    - TokenBudgetCapability           → TokenBudgetPort
+    - SecurityCapability              → SecurityPort
+    - MessagingCapability             → MessagingContract
+    - AgentLifecycleManagerCapability → AgentLifecyclePort
+    - ObservabilityCapability         → ObservabilityPort
+
+    Protocols:
+    - All inbound messages are HMAC-SHA256 verified before processing.
+    - All inbound messages are TTL-checked before processing.
+    - All prompts are scanned for injection before LLM call.
+    - Token budget is checked before every LLM call.
+    - Heartbeat is emitted every 30 seconds.
+    - LoopGuard enforces iteration ceiling; raises LoopLimitExceededError.
+    - inQ is asyncio.PriorityQueue; CRITICAL (0) messages processed first.
+    - outQ is asyncio.PriorityQueue; CRITICAL (0) messages dispatched first.
+    - All tool calls go exclusively through MCP 2025-11-25 Streamable HTTP transport.
+    - All inter-agent communication uses OctopussyMessage exclusively (no direct calls).
+    """
+
+    @abstractmethod
+    async def enqueue(self, message: OctopussyMessage) -> None:
+        """Enqueue an inbound message into inQ. Priority derived from message.priority."""
+        ...
+
+    @abstractmethod
+    async def pause(self) -> None: ...
+
+    @abstractmethod
+    async def resume(self) -> None: ...
+
+    @abstractmethod
+    async def stop(self) -> None: ...
+
+    @abstractmethod
+    async def inject_dependency(self) -> None:
+        """
+        CCA Lifecycle Phase 3: inject all required interface references.
+        Injects: LLMPort, VLMPort, MemoryPort, RAGPort, GraphPort,
+                 ToolExecutorPort, SandboxPort, TokenBudgetPort,
+                 SecurityPort, MessagingContract, AgentLifecyclePort,
+                 ObservabilityPort.
+        """
+        ...
+
+
+CAPABILITY_VERSION     = "5.0"
+MINIMUM_CLIENT_VERSION = "4.0"
+DEPRECATION_POLICY     = "12 months notice before removal of any Contract method"
+MIGRATION_GUIDE        = "docs/migration/actor_5_0.md"
+
+Agent Core Implementation:
+# octopussy/capabilities/actor/essence/agent_base.py
+
+from __future__ import annotations
+import asyncio
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Any
+from uuid import UUID
+
+from octopussy.core.enums import AgentState, MessageType
+from octopussy.core.message import OctopussyMessage
+from octopussy.core.models.agent_spec import AgentSpec
+from octopussy.core.ports.ports import (
+    AgentLifecyclePort, ObservabilityPort, SecurityPort,
+    TokenBudgetPort, ToolExecutorPort, MemoryPort,
+)
+from octopussy.core.ports.llm_ports import LLMPort, VLMPort
+from octopussy.core.ports.rag_ports import RAGPort
+from octopussy.core.ports.graph_ports import GraphPort
+
+
+@dataclass
+class AgentContext:
+    """
+    Runtime context passed to tool executors and MCP clients.
+    Intentionally mutable during task execution; not shared between agents.
+    """
+    agent_id:   UUID
+    session_id: UUID
+    trace_id:   UUID
+    spec:       AgentSpec
+    iteration:  int = 0
+
+
+class OctopussyAgent(ABC):
+    """
+    Abstract base class for all Octopussy agents.
+
+    Template Method pattern: _message_loop() defines the fixed algorithm.
+    Subclasses override process_task() to implement agent-specific behavior.
+
+    All agents:
+    - Communicate exclusively via OctopussyMessage (never direct method calls)
+    - Never share state with other agents
+    - Never block the event loop
+    - Verify every inbound message signature before processing
+    - Check TTL before processing
+    - Check token budget before every LLM call
+    - Emit heartbeats every _HEARTBEAT_INTERVAL_SEC seconds
+    - Respect LoopGuard iteration ceiling
+    - inQ: asyncio.PriorityQueue — CRITICAL (0) processed first
+    - outQ: asyncio.PriorityQueue — CRITICAL (0) dispatched first
+    """
+
+    _HEARTBEAT_INTERVAL_SEC: int = 30
+
+    def __init__(
+        self,
+        spec:           AgentSpec,
+        hmac_secret:    bytes,
+        lifecycle:      AgentLifecyclePort,
+        obs:            ObservabilityPort,
+        security:       SecurityPort,
+        token_budget:   TokenBudgetPort,
+        tool_executor:  ToolExecutorPort,
+        llm_port:       LLMPort,
+        vlm_port:       VLMPort | None       = None,
+        rag:            RAGPort | None        = None,
+        graph:          GraphPort | None      = None,
+        memory:         MemoryPort | None     = None,
+    ) -> None:
+        if not isinstance(hmac_secret, bytes):
+            raise TypeError("hmac_secret must be bytes")
+        self._spec          = spec
+        self._agent_id      = spec.agent_id
+        self._hmac_secret   = hmac_secret
+        self._lifecycle     = lifecycle
+        self._obs           = obs
+        self._security      = security
+        self._token_budget  = token_budget
+        self._tool_executor = tool_executor
+        self._llm_port      = llm_port
+        self._vlm_port      = vlm_port
+        self._rag           = rag
+        self._graph         = graph
+        self._memory        = memory
+
+        # inQ: priority inbound queue (asyncio.PriorityQueue)
+        # Items are (priority_value: int, message: OctopussyMessage)
+        # CRITICAL=0 is dequeued first.
+        self._inQ:  asyncio.PriorityQueue[tuple[int, OctopussyMessage]] = asyncio.PriorityQueue()
+        # outQ: priority outbound queue (asyncio.PriorityQueue)
+        # Items are (priority_value: int, message: OctopussyMessage)
+        # CRITICAL=0 is dispatched first.
+        self._outQ: asyncio.PriorityQueue[tuple[int, OctopussyMessage]] = asyncio.PriorityQueue()
+
+        self._running:  bool = False
+        self._paused:   bool = False
+        self._loop_count: int = 0
+
+    async def start(self) -> None:
+        """Start all agent loops. Called by OCLM during start() phase."""
+        self._running = True
+        await self._lifecycle.register_agent(self._agent_id, self._spec.name)
+        await self._lifecycle.transition_state(self._agent_id, AgentState.IDLE)
+        asyncio.create_task(self._message_loop())
+        asyncio.create_task(self._outbound_dispatch_loop())
+        asyncio.create_task(self._heartbeat_loop())
+
+    async def enqueue(self, message: OctopussyMessage) -> None:
+        """Enqueue an inbound message. Priority derived from message.priority."""
+        await self._inQ.put((int(message.priority), message))
+
+    async def pause(self) -> None:
+        self._paused = True
+        await self._lifecycle.transition_state(self._agent_id, AgentState.PAUSED)
+
+    async def resume(self) -> None:
+        self._paused = False
+        await self._lifecycle.transition_state(self._agent_id, AgentState.IDLE)
+
+    async def stop(self) -> None:
+        self._running = False
+        await self._lifecycle.transition_state(self._agent_id, AgentState.STOPPING)
+
+    async def _message_loop(self) -> None:
+        """
+        Template Method: fixed algorithm for all agents.
+        Chain of Responsibility: sig → TTL → control → injection → budget → process
+        """
+        while self._running:
+            if self._paused:
+                await asyncio.sleep(0.1)
+                continue
+            try:
+                _, message = await asyncio.wait_for(self._inQ.get(), timeout=1.0)
+            except asyncio.TimeoutError:
+                continue
+
+            try:
+                # Step 1: Verify HMAC-SHA256 signature
+                if not message.verify_signature(self._hmac_secret):
+                    self._obs.log("WARNING", "Invalid signature; dropping message",
+                                  {"message_id": str(message.message_id)})
+                    continue
+
+                # Step 2: TTL check
+                if message.is_expired():
+                    self._obs.log("WARNING", "Expired message; dropping",
+                                  {"message_id": str(message.message_id)})
+                    continue
+
+                # Step 3: Control messages
+                if message.message_type == MessageType.CONTROL:
+                    await self._handle_control(message)
+                    continue
+
+                # Step 4: Prompt injection scan
+                task_text = message.payload.get("task", "")
+                if not await self._security.scan_prompt(task_text):
+                    self._obs.log("WARNING", "Prompt injection detected; dropping",
+                                  {"message_id": str(message.message_id)})
+                    continue
+
+                # Step 5: Token budget check
+                if not await self._token_budget.check_budget(self._agent_id, "hourly"):
+                    self._obs.log("WARNING", "Token budget exhausted; dropping",
+                                  {"message_id": str(message.message_id)})
+                    continue
+
+                # Step 6: LoopGuard
+                self._loop_count += 1
+                if self._loop_count > self._spec.permissions.max_iterations:
+                    self._obs.log("ERROR", "LoopGuard: iteration ceiling exceeded",
+                                  {"agent_id": str(self._agent_id)})
+                    await self._lifecycle.transition_state(self._agent_id, AgentState.ERROR)
+                    break
+
+                # Step 7: Process
+                await self._lifecycle.transition_state(self._agent_id, AgentState.PROCESSING)
+                result = await self.process_task(message)
+                await self._lifecycle.transition_state(self._agent_id, AgentState.IDLE)
+
+            except Exception as exc:
+                self._obs.log("ERROR", f"Agent error: {exc}",
+                              {"agent_id": str(self._agent_id), "exc": str(exc)})
+                await self._lifecycle.transition_state(self._agent_id, AgentState.ERROR)
+
+    async def _outbound_dispatch_loop(self) -> None:
+        """Consume outQ and forward messages to MessagingCapability."""
+        while self._running:
+            try:
+                _, message = await asyncio.wait_for(self._outQ.get(), timeout=1.0)
+                await self._dispatch_outbound(message)
+            except asyncio.TimeoutError:
+                continue
+
+    async def _heartbeat_loop(self) -> None:
+        """Emit heartbeat every _HEARTBEAT_INTERVAL_SEC seconds."""
+        while self._running:
+            await asyncio.sleep(self._HEARTBEAT_INTERVAL_SEC)
+            await self._lifecycle.record_heartbeat(self._agent_id)
+
+    async def _handle_control(self, message: OctopussyMessage) -> None:
+        """Handle CONTROL messages (pause, resume, stop)."""
+        command = message.payload.get("command", "")
+        if command == "pause":
+            await self.pause()
+        elif command == "resume":
+            await self.resume()
+        elif command == "stop":
+            await self.stop()
+
+    @abstractmethod
+    async def process_task(self, message: OctopussyMessage) -> Any:
+        """Subclasses implement agent-specific task processing logic here."""
+        ...
+
+    @abstractmethod
+    async def _dispatch_outbound(self, message: OctopussyMessage) -> None:
+        """Dispatch a message from outQ via MessagingCapability."""
+        ...
+
+Agent subtypes:
+# octopussy/capabilities/actor/essence/agent_types.py
+
+from octopussy.capabilities.actor.essence.agent_base import OctopussyAgent
+from octopussy.core.message import OctopussyMessage
+from typing import Any
+
+
+class StatelessOneShot(OctopussyAgent):
+    """Executes once, returns result, terminates."""
+    async def process_task(self, message: OctopussyMessage) -> Any: ...
+    async def _dispatch_outbound(self, message: OctopussyMessage) -> None: ...
+
+
+class StatefulLoop(OctopussyAgent):
+    """Executes repeatedly until stopped; maintains state across iterations."""
+    async def process_task(self, message: OctopussyMessage) -> Any: ...
+    async def _dispatch_outbound(self, message: OctopussyMessage) -> None: ...
+
+
+class ScheduledTaskDaemon(OctopussyAgent):
+    """Wakes on cron schedule; executes; sleeps."""
+    async def process_task(self, message: OctopussyMessage) -> Any: ...
+    async def _dispatch_outbound(self, message: OctopussyMessage) -> None: ...
+
+
+4.4 TeamCapability
+Purpose: Creates and manages multi-agent teams. Supports Coordinator/Worker, Pipeline, Mesh+Blackboard, and Tree patterns.
+TeamCapability
+│
+├── Essence
+│   ├── CoordinatorWorkerEngine — coordinator delegates subtasks to workers
+│   ├── PipelineEngine          — sequential agent pipeline
+│   ├── MeshBlackboardEngine    — peer-to-peer with shared Redis blackboard
+│   └── TreeEngine              — hierarchical parent/child delegation
+│
+├── Realization
+│   ├── BlackboardStore         — Redis-backed shared blackboard for mesh teams
+│   └── TeamStateStore          — persists team state (SQLite)
+│
+└── Adaptation
+    └── TeamAdapter             — implements TeamContract
+
+# octopussy/capabilities/team/contract.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from uuid import UUID
+
+from octopussy.core.models.agent_spec import TeamHandle
+
+
+class TeamContract(ABC):
+    """
+    Provisions (interfaces this Capability provides to others):
+    - create_team: create a multi-agent team from a team config directory
+    - dissolve_team: dissolve a team and stop all member agents
+    - submit_team_task: submit a task to a team
+    - get_team_result: retrieve the result of a team task
+    - list_teams: list all active teams
+
+    Requirements (interfaces this Capability consumes, injected via inject_dependency()):
+    - AgentFactoryCapability          → AgentFactoryContract
+    - AgentLifecycleManagerCapability → AgentLifecyclePort
+    - MessagingCapability             → MessagingContract
+    - MemoryCapability                → MemoryPort
+    - ObservabilityCapability         → ObservabilityPort
+
+    Protocols:
+    - All inter-agent communication within a team uses OctopussyMessage exclusively.
+    - Team coordination patterns: Coordinator/Worker, Pipeline, Mesh+Blackboard, Tree.
+    - Blackboard is shared read/write among all mesh team members (Redis-backed).
+    - Result synthesis strategy is configurable per team (coordinator | vote | concat).
+    - All team messages are signed and priority-queued (inQ/outQ as asyncio.PriorityQueue).
+    """
+
+    @abstractmethod
+    async def create_team(self, team_config_dir: str) -> TeamHandle: ...
+
+    @abstractmethod
+    async def dissolve_team(self, team_id: UUID) -> None: ...
+
+    @abstractmethod
+    async def submit_team_task(
+        self, team_id: UUID, task: str, priority: str = "NORMAL"
+    ) -> UUID: ...
+
+    @abstractmethod
+    async def get_team_result(self, task_id: UUID) -> dict: ...
+
+    @abstractmethod
+    async def list_teams(self) -> list[dict]: ...
+
+    @abstractmethod
+    async def inject_dependency(self) -> None:
+        """CCA Lifecycle Phase 3: inject all required interface references."""
+        ...
+
+
+CAPABILITY_VERSION     = "5.0"
+MINIMUM_CLIENT_VERSION = "4.0"
+DEPRECATION_POLICY     = "12 months notice before removal of any Contract method"
+MIGRATION_GUIDE        = "docs/migration/team_5_0.md"
+
+
+4.5 LLMRouterCapability
+Purpose: Resolves the best LLMPort or VLMPort for a given agent intelligence spec. Supports fallback chains, GPU-aware routing, and hot-reload of routing tables.
+LLMRouterCapability
+│
+├── Essence
+│   ├── RoutingEngine          — applies routing strategy (COST/QUALITY/BALANCED/LOCAL/CLOUD)
+│   ├── HealthChecker          — polls all providers for health status
+│   └── FallbackChainResolver  — applies primary → fallback → error chain
+│
+├── Realization
+│   ├── RoutingTableStore      — loads routing_table.yaml
+│   └── GPUDetector            — detects available GPU backends
+│
+└── Adaptation
+    └── LLMRouterAdapter       — implements LLMRouterContract
+
+# octopussy/capabilities/llm_router/contract.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+
+from octopussy.core.models.agent_spec import LLMIntelligenceSpec
+from octopussy.core.ports.llm_ports import LLMPort, VLMPort
+
+
+class LLMRouterContract(ABC):
+    """
+    Provisions (interfaces this Capability provides to others):
+    - resolve_llm_port: resolve best LLMPort for a given intelligence spec
+    - resolve_vlm_port: resolve VLMPort if VLM is enabled
+    - reload_routing_table: hot-reload routing_table.yaml
+    - list_providers: list all registered providers with health status
+
+    Default LLMPorts provided (one per provider):
+      OllamaLLMPort, LMStudioLLMPort, VLLMLLMPort, SGLangLLMPort,
+      HuggingFaceTransformersLLMPort, MLXLLMPort,
+      OpenAILLMPort, AnthropicLLMPort, GoogleGeminiLLMPort,
+      AWSBedrockLLMPort, AzureOpenAILLMPort
+
+    Default VLMPorts provided (one per VLM-capable provider):
+      OllamaVLMPort, LMStudioVLMPort, VLLMVLMPort,
+      HuggingFaceTransformersVLMPort, MLXVLMPort,
+      OpenAIVLMPort, AnthropicVLMPort, GoogleGeminiVLMPort,
+      AWSBedrockVLMPort, AzureOpenAIVLMPort
+
+    Requirements (interfaces this Capability consumes, injected via inject_dependency()):
+    - ConfigurationCapability → ConfigurationPort
+    - SecretsCapability       → SecretsPort
+    - PluginCapability        → PluginContract
+    - ObservabilityCapability → ObservabilityPort
+
+    Protocols:
+    - resolve_llm_port() applies routing strategy from AgentSpec.intelligence.
+    - If no healthy provider is available, raises LLMProviderError.
+    - Fallback chain applied in order: primary → fallback → error.
+    - GPU backend selected automatically based on hardware detection.
+    - reload_routing_table() applies changes without system restart.
+    - Provider API keys retrieved from SecretsCapability (never stored in config).
+    - All cloud provider calls use REST over HTTPS with API-key authentication.
+    - All local provider calls use REST over HTTP (localhost only).
+    """
+
+    @abstractmethod
+    async def resolve_llm_port(self, spec: LLMIntelligenceSpec) -> LLMPort: ...
+
+    @abstractmethod
+    async def resolve_vlm_port(self, spec: LLMIntelligenceSpec) -> VLMPort | None: ...
+
+    @abstractmethod
+    async def reload_routing_table(self) -> None: ...
+
+    @abstractmethod
+    async def list_providers(self) -> list[dict]: ...
+
+    @abstractmethod
+    async def inject_dependency(self) -> None:
+        """CCA Lifecycle Phase 3: inject all required interface references."""
+        ...
+
+
+CAPABILITY_VERSION     = "5.0"
+MINIMUM_CLIENT_VERSION = "4.0"
+DEPRECATION_POLICY     = "12 months notice before removal of any Contract method"
+MIGRATION_GUIDE        = "docs/migration/llm_router_5_0.md"
+
+
+4.6 MemoryCapability
+Purpose: Provides long-term key-value memory and semantic search memory for agents.
+MemoryCapability
+│
+├── Essence
+│   ├── LongTermMemoryStore    — key-value persistence across conversations
+│   └── SemanticMemorySearch   — embedding-based search over accumulated memory
+│
+├── Realization
+│   ├── SQLiteMemoryBackend    — SQLite backend (default)
+│   ├── RedisMemoryBackend     — Redis backend
+│   ├── PostgreSQLMemoryBackend — PostgreSQL backend
+│   └── EmbeddingSearchEngine  — sentence-transformers for semantic search
+│
+└── Adaptation
+    └── MemoryAdapter          — exposes MemoryPort to agents via DI
+
+# octopussy/capabilities/memory/contract.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from uuid import UUID
+
+
+class MemoryContract(ABC):
+    """
+    Provisions (interfaces this Capability provides to others):
+    - store: persist a key-value entry for an agent
+    - retrieve: retrieve a value by key for an agent
+    - search: semantic search over an agent's memory
+    - delete: delete a key-value entry for an agent
+    - clear: clear all memory for an agent
+
+    Requirements (interfaces this Capability consumes, injected via inject_dependency()):
+    - ConfigurationCapability → ConfigurationPort
+    - ObservabilityCapability → ObservabilityPort
+
+    Protocols:
+    - Memory is isolated per agent_id; no cross-agent access.
+    - store() and retrieve() are O(1) key-value operations.
+    - search() uses sentence-transformers embeddings for semantic similarity.
+    - Backend selected from config: sqlite (default), redis, postgresql.
+    - All operations are async; no blocking I/O.
+    """
+
+    @abstractmethod
+    async def store(self, agent_id: UUID, key: str, value: str) -> None: ...
+
+    @abstractmethod
+    async def retrieve(self, agent_id: UUID, key: str) -> str | None: ...
+
+    @abstractmethod
+    async def search(self, agent_id: UUID, query: str, top_k: int = 5) -> list[dict]: ...
+
+    @abstractmethod
+    async def delete(self, agent_id: UUID, key: str) -> None: ...
+
+    @abstractmethod
+    async def clear(self, agent_id: UUID) -> None: ...
+
+    @abstractmethod
+    async def inject_dependency(self) -> None:
+        """CCA Lifecycle Phase 3: inject all required interface references."""
+        ...
+
+
+CAPABILITY_VERSION     = "5.0"
+MINIMUM_CLIENT_VERSION = "4.0"
+DEPRECATION_POLICY     = "12 months notice before removal of any Contract method"
+MIGRATION_GUIDE        = "docs/migration/memory_5_0.md"
+
+
+4.7 RAGCapability &amp; GraphRAGCapability
+# octopussy/capabilities/rag/contract.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+
+
+class RAGContract(ABC):
+    """
+    Provisions (interfaces this Capability provides to others):
+    - ingest: ingest documents into a collection
+    - retrieve: retrieve top-k relevant chunks for a query
+    - delete_collection: delete an entire collection
+
+    Default RAGPorts provided (one per vector DB backend):
+      ChromaDBRAGPort (default), PGVectorRAGPort, WeaviateRAGPort,
+      QdrantRAGPort, MilvusRAGPort, VectorDBPluginRAGPort
+
+    Requirements (interfaces this Capability consumes, injected via inject_dependency()):
+    - ConfigurationCapability → ConfigurationPort
+    - MemoryCapability        → MemoryPort
+    - PluginCapability        → PluginContract
+    - ObservabilityCapability → ObservabilityPort
+
+    Protocols:
+    - Collections are isolated per agent_id.
+    - ingest() chunks, embeds, and stores documents.
+    - retrieve() embeds query and performs vector search, then reranks.
+    - delete_collection() removes all documents for the given collection.
+    - Backend selected from config: chromadb (default), pgvector, weaviate, qdrant, milvus, plugin.
+    - All operations are async; no blocking I/O.
+    """
+
+    @abstractmethod
+    async def ingest(self, collection_name: str,
+                     documents: list[str], metadata: list[dict]) -> int: ...
+
+    @abstractmethod
+    async def retrieve(self, collection_name: str,
+                       query: str, top_k: int = 5) -> list[dict]: ...
+
+    @abstractmethod
+    async def delete_collection(self, collection_name: str) -> None: ...
+
+    @abstractmethod
+    async def inject_dependency(self) -> None:
+        """CCA Lifecycle Phase 3: inject all required interface references."""
+        ...
+
+
+CAPABILITY_VERSION     = "5.0"
+MINIMUM_CLIENT_VERSION = "4.0"
+DEPRECATION_POLICY     = "12 months notice before removal of any Contract method"
+MIGRATION_GUIDE        = "docs/migration/rag_5_0.md"
+
+# octopussy/capabilities/graph_rag/contract.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+
+
+class GraphRAGContract(ABC):
+    """
+    Provisions (interfaces this Capability provides to others):
+    - query: execute a Cypher/AQL query against the graph
+    - upsert_node: create or update a graph node
+    - upsert_edge: create or update a graph edge
+    - delete_node: delete a graph node
+
+    Default GraphPorts provided (one per graph DB backend):
+      Neo4jGraphPort (default), ArangoDBGraphPort, TigerGraphPort,
+      GraphDBPluginGraphPort
+
+    Requirements (interfaces this Capability consumes, injected via inject_dependency()):
+    - ConfigurationCapability → ConfigurationPort
+    - SecretsCapability       → SecretsPort
+    - ObservabilityCapability → ObservabilityPort
+
+    Protocols:
+    - Graph credentials retrieved from SecretsCapability (never stored in config).
+    - Neo4j: Bolt protocol (bolt://host:7687). Credentials from SecretsCapability.
+    - All operations are async; no blocking I/O.
+    """
+
+    @abstractmethod
+    async def query(self, cypher: str, parameters: dict | None = None) -> list[dict]: ...
+
+    @abstractmethod
+    async def upsert_node(self, label: str, properties: dict) -> str: ...
+
+    @abstractmethod
+    async def upsert_edge(self, from_id: str, to_id: str,
+                          relation: str, properties: dict | None = None) -> None: ...
+
+    @abstractmethod
+    async def delete_node(self, node_id: str) -> None: ...
+
+    @abstractmethod
+    async def inject_dependency(self) -> None:
+        """CCA Lifecycle Phase 3: inject all required interface references."""
+        ...
+
+
+CAPABILITY_VERSION     = "5.0"
+MINIMUM_CLIENT_VERSION = "4.0"
+DEPRECATION_POLICY     = "12 months notice before removal of any Contract method"
+MIGRATION_GUIDE        = "docs/migration/graph_rag_5_0.md"
+
+
+4.8 ToolRegistryCapability
+# octopussy/capabilities/tool_registry/contract.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from uuid import UUID
+
+
+class ToolRegistryContract(ABC):
+    """
+    Provisions (interfaces this Capability provides to others):
+    - register_tool: register a new tool descriptor
+    - execute_tool: execute a tool with permission check and sandbox isolation
+    - list_tools: list all registered tools
+    - get_tool_descriptor: retrieve a tool descriptor by tool_id
+
+    Requirements (interfaces this Capability consumes, injected via inject_dependency()):
+    - PluginCapability        → PluginContract
+    - SandboxCapability       → SandboxPort
+    - SecurityCapability      → SecurityPort
+    - ObservabilityCapability → ObservabilityPort
+
+    Protocols:
+    - execute_tool() checks agent permissions before execution (allowlist).
+    - Absence of permission = denial (ToolPermissionError).
+    - All tool execution occurs in a sandboxed subprocess via SandboxCapability.
+    - Tool output is validated against the tool's output schema.
+    - ToolNotFoundError raised if tool_id is not registered.
+    - All tool calls are routed exclusively through MCP 2025-11-25 Streamable HTTP transport.
+    - LLM-dependent tool calling mechanisms are not used.
+    """
+
+    @abstractmethod
+    async def register_tool(self, descriptor: dict) -> None: ...
+
+    @abstractmethod
+    async def execute_tool(self, agent_id: UUID, tool_id: str, args: dict) -> dict: ...
+
+    @abstractmethod
+    async def list_tools(self) -> list[dict]: ...
+
+    @abstractmethod
+    async def get_tool_descriptor(self, tool_id: str) -> dict: ...
+
+    @abstractmethod
+    async def inject_dependency(self) -> None:
+        """CCA Lifecycle Phase 3: inject all required interface references."""
+        ...
+
+
+CAPABILITY_VERSION     = "5.0"
+MINIMUM_CLIENT_VERSION = "4.0"
+DEPRECATION_POLICY     = "12 months notice before removal of any Contract method"
+MIGRATION_GUIDE        = "docs/migration/tool_registry_5_0.md"
+
+
+4.9 PluginCapability
+# octopussy/capabilities/plugin/contract.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+
+
+class PluginContract(ABC):
+    """
+    Provisions (interfaces this Capability provides to others):
+    - load_plugin: load a plugin from a directory
+    - hot_reload_plugin: hot-reload a plugin without restart
+    - unload_plugin: unload a plugin
+    - list_plugins: list all loaded plugins
+
+    Requirements (interfaces this Capability consumes, injected via inject_dependency()):
+    - ConfigurationCapability → ConfigurationPort
+    - ObservabilityCapability → ObservabilityPort
+
+    Protocols:
+    - load_plugin() validates plugin.json before loading.
+    - hot_reload_plugin() applies changes without system restart.
+    - unload_plugin() cleanly removes all plugin registrations.
+    - Plugin types: TOOL_PLUGIN, LLM_ADAPTER_PLUGIN, VLM_ADAPTER_PLUGIN,
+      COMM_ADAPTER_PLUGIN, VECTOR_DB_PLUGIN, GRAPH_DB_PLUGIN,
+      MCP_SERVER_PLUGIN, INFERENCE_ENGINE_PLUGIN, PROMPT_PATTERN_PLUGIN,
+      USER_AGENT_PLUGIN.
+    - USER_AGENT_PLUGIN plugins register their agent class via
+      UserAgentExtensionCapability.register_agent_class() during load_plugin().
+    - OctopussyMCPServer validates MCP-Protocol-Version: 2025-11-25 header on all requests.
+    - Unsupported MCP protocol versions receive a clear error response.
+    """
+
+    @abstractmethod
+    async def load_plugin(self, plugin_dir: str) -> str: ...
+
+    @abstractmethod
+    async def hot_reload_plugin(self, plugin_id: str) -> None: ...
+
+    @abstractmethod
+    async def unload_plugin(self, plugin_id: str) -> None: ...
+
+    @abstractmethod
+    async def list_plugins(self) -> list[dict]: ...
+
+    @abstractmethod
+    async def inject_dependency(self) -> None:
+        """CCA Lifecycle Phase 3: inject all required interface references."""
+        ...
+
+
+CAPABILITY_VERSION     = "5.0"
+MINIMUM_CLIENT_VERSION = "4.0"
+DEPRECATION_POLICY     = "12 months notice before removal of any Contract method"
+MIGRATION_GUIDE        = "docs/migration/plugin_5_0.md"
+
+
+4.10 MessagingCapability
+MessagingCapability
+│
+├── Essence
+│   ├── MessageRouter          — routes messages to correct agent queues
+│   ├── DeadLetterQueue        — captures ALL messages that could not be delivered
+│   │                            after maximum retry attempts
+│   └── MessageValidator       — validates message format and signature
+│
+├── Realization
+│   ├── NATSAdapter            — NATS.io message bus (default) → NATSCommunicationPort
+│   ├── RabbitMQAdapter        — RabbitMQ AMQP bus (optional) → RabbitMQCommunicationPort
+│   ├── InMemoryBusAdapter     — in-process bus for single-node deployments
+│   └── DLQStore               — persists DLQ entries (SQLite); never discards silently
+│
+└── Adaptation
+    └── MessagingAdapter       — exposes MessagingContract and DLQPort
+
+# octopussy/capabilities/messaging/contract.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from typing import Any
+from uuid import UUID
+
+from octopussy.core.message import OctopussyMessage
+
+
+class MessagingContract(ABC):
+    """
+    Provisions (interfaces this Capability provides to others):
+    - publish: publish a message to the bus
+    - subscribe: subscribe an agent's inQ to receive messages
+    - unsubscribe: unsubscribe an agent from the message bus
+    - get_dlq_messages: retrieve messages from the Dead Letter Queue
+    - replay_dlq_message: replay a DLQ message
+    - discard_dlq_message: permanently discard a DLQ entry
+    - get_dlq_size: return the current number of DLQ entries
+
+    Requirements (interfaces this Capability consumes, injected via inject_dependency()):
+    - ConfigurationCapability → ConfigurationPort
+    - SecurityCapability      → SecurityPort
+    - ObservabilityCapability → ObservabilityPort
+
+    Protocols:
+    - Default transport: NATS.io pub/sub (nats://host:4222).
+    - Optional transport: RabbitMQ AMQP 0-9-1 (amqp://host:5672 or amqps://host:5671 with TLS).
+    - publish() routes message to recipient's inQ (asyncio.PriorityQueue).
+    - Messages failing delivery after 3 attempts go to DLQ (never silently discarded).
+    - DLQ entries are persisted in SQLite and survive system restarts.
+    - DLQ messages can be replayed via CLI or REST API.
+    - All messages are signature-verified (HMAC-SHA256) before routing.
+    - All messages are priority-ordered: CRITICAL (0) routed first.
+
+    Dead Letter Queue (DLQ) — Normative:
+    Every message that cannot be delivered after 3 consecutive attempts is stored in the DLQ.
+    No message is ever silently discarded. Every DLQ entry contains: the full original
+    OctopussyMessage, the failure reason, the attempt count, and the timestamp of the last
+    failure. DLQ entries are persisted in SQLite (dlq_store.py) and survive system restarts.
+    DLQ entries can be inspected and replayed via:
+      CLI:  octopussy task list --dlq
+            octopussy task replay <dlq_entry_id>
+            octopussy task discard <dlq_entry_id>
+      REST: GET  /api/v1/dlq
+            POST /api/v1/dlq/{dlq_entry_id}/replay
+            DELETE /api/v1/dlq/{dlq_entry_id}
+    """
+
+    @abstractmethod
+    async def publish(self, message: OctopussyMessage) -> None:
+        """
+        Publish a message to the bus.
+        Raises MessageSignatureError if signature is invalid.
+        After 3 failed delivery attempts, message is stored in DLQ.
+        """
+        ...
+
+    @abstractmethod
+    async def subscribe(self, agent_id: UUID, queue: Any) -> None:
+        """Subscribe an agent's inQ (asyncio.PriorityQueue) to receive messages."""
+        ...
+
+    @abstractmethod
+    async def unsubscribe(self, agent_id: UUID) -> None: ...
+
+    @abstractmethod
+    async def get_dlq_messages(self, limit: int = 100) -> list[dict]: ...
+
+    @abstractmethod
+    async def replay_dlq_message(self, dlq_entry_id: str) -> None: ...
+
+    @abstractmethod
+    async def discard_dlq_message(self, dlq_entry_id: str) -> None: ...
+
+    @abstractmethod
+    async def get_dlq_size(self) -> int: ...
+
+    @abstractmethod
+    async def inject_dependency(self) -> None:
+        """CCA Lifecycle Phase 3: inject all required interface references."""
+        ...
+
+
+CAPABILITY_VERSION     = "5.0"
+MINIMUM_CLIENT_VERSION = "4.0"
+DEPRECATION_POLICY     = "12 months notice before removal of any Contract method"
+MIGRATION_GUIDE        = "docs/migration/messaging_5_0.md"
+
+
+4.11 CommunicationAdapterCapability
+# octopussy/capabilities/comm_adapter/contract.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+
+
+class CommunicationAdapterContract(ABC):
+    """
+    Provisions (interfaces this Capability provides to others):
+    - enable_channel: enable a communication channel adapter
+    - disable_channel: disable a communication channel adapter
+    - list_channels: list all active channel adapters
+
+    Requirements (interfaces this Capability consumes, injected via inject_dependency()):
+    - PluginCapability        → PluginContract
+    - MessagingCapability     → MessagingContract
+    - SecurityCapability      → SecurityPort
+    - ObservabilityCapability → ObservabilityPort
+
+    Protocols:
+    - All inbound channel messages are converted to signed OctopussyMessage instances.
+    - All outbound OctopussyMessages are converted to channel-native format.
+    - Channel adapters are loaded as COMM_ADAPTER_PLUGIN plugins.
+    - All channel credentials are retrieved from SecretsCapability via SecurityCapability.
+    - Inbound messages from channels are published to the NATS bus (NATSCommunicationPort).
+    - Outbound messages to channels use channel-specific REST APIs over HTTPS.
+    """
+
+    @abstractmethod
+    async def enable_channel(self, channel_id: str) -> None: ...
+
+    @abstractmethod
+    async def disable_channel(self, channel_id: str) -> None: ...
+
+    @abstractmethod
+    async def list_channels(self) -> list[dict]: ...
+
+    @abstractmethod
+    async def inject_dependency(self) -> None:
+        """CCA Lifecycle Phase 3: inject all required interface references."""
+        ...
+
+
+CAPABILITY_VERSION     = "5.0"
+MINIMUM_CLIENT_VERSION = "4.0"
+DEPRECATION_POLICY     = "12 months notice before removal of any Contract method"
+MIGRATION_GUIDE        = "docs/migration/comm_adapter_5_0.md"
+
+
+4.12 SecurityCapability
+# octopussy/capabilities/security/contract.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from uuid import UUID
+
+
+class SecurityContract(ABC):
+    """
+    Provisions (interfaces this Capability provides to others):
+    - authenticate: verify JWT bearer token; return user claims
+    - authorize: RBAC authorization check (deny-by-default)
+    - scan_prompt: scan for prompt injection attacks
+    - validate_output: validate agent output against guardrail policy
+    - audit: write an immutable audit log entry
+
+    Requirements (interfaces this Capability consumes, injected via inject_dependency()):
+    - SecretsCapability       → SecretsPort
+    - ConfigurationCapability → ConfigurationPort
+    - ObservabilityCapability → ObservabilityPort
+
+    Protocols:
+    - Zero-trust: every request authenticated and authorized before processing.
+    - mTLS enforced at transport layer for all server-to-server calls.
+    - JWT authentication for all REST and WebSocket requests.
+    - TOTP mandatory for SUPERUSER and ADMIN roles.
+    - RBAC: deny-by-default; permissions are explicit allowlists.
+    - HMAC-SHA256 signatures mandatory on all OctopussyMessage instances.
+    - Prompt injection scan: every prompt scanned before LLM call.
+    - Guardrail validation: every agent output validated before delivery.
+    - Audit log: append-only JSONL file; entries are never deleted.
+    """
+
+    @abstractmethod
+    async def authenticate(self, token: str) -> dict: ...
+
+    @abstractmethod
+    async def authorize(self, user_id: UUID, resource: str, action: str) -> bool: ...
+
+    @abstractmethod
+    async def scan_prompt(self, prompt: str) -> bool: ...
+
+    @abstractmethod
+    async def validate_output(self, output: str, policy: str) -> bool: ...
+
+    @abstractmethod
+    def audit(self, event: str, actor: object, resource: str,
+              outcome: str, details: dict) -> None: ...
+
+    @abstractmethod
+    async def inject_dependency(self) -> None:
+        """CCA Lifecycle Phase 3: inject all required interface references."""
+        ...
+
+
+CAPABILITY_VERSION     = "5.0"
+MINIMUM_CLIENT_VERSION = "4.0"
+DEPRECATION_POLICY     = "12 months notice before removal of any Contract method"
+MIGRATION_GUIDE        = "docs/migration/security_5_0.md"
+
+
+4.13 SecretsCapability
+# octopussy/capabilities/secrets/contract.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+
+
+class SecretsContract(ABC):
+    """
+    Provisions (interfaces this Capability provides to others):
+    - get_secret: retrieve a secret by name
+    - set_secret: store a new secret
+    - rotate_secret: rotate a secret (generates new value, updates store)
+    - delete_secret: delete a secret
+
+    Requirements (interfaces this Capability consumes, injected via inject_dependency()):
+    - None (SecretsCapability has no dependencies; it starts first)
+
+    Protocols:
+    - Default backend: local AES-256-GCM encrypted file store.
+    - Optional backend: HashiCorp Vault (hvac client, REST API over HTTPS).
+    - Secrets are never stored in configuration files or environment variables.
+    - All secret values are encrypted at rest.
+    - rotate_secret() generates a new value and updates all dependent Capabilities
+      via event notification (after ObservabilityCapability starts).
+    - SecretsCapability starts before all other Capabilities (no dependencies).
+    """
+
+    @abstractmethod
+    async def get_secret(self, name: str) -> str: ...
+
+    @abstractmethod
+    async def set_secret(self, name: str, value: str) -> None: ...
+
+    @abstractmethod
+    async def rotate_secret(self, name: str) -> str: ...
+
+    @abstractmethod
+    async def delete_secret(self, name: str) -> None: ...
+
+    @abstractmethod
+    async def inject_dependency(self) -> None:
+        """
+        CCA Lifecycle Phase 3.
+        SecretsCapability has no Requirements; this method is a no-op
+        but is present to satisfy the mandatory six-phase lifecycle.
+        """
+        ...
+
+
+CAPABILITY_VERSION     = "5.0"
+MINIMUM_CLIENT_VERSION = "4.0"
+DEPRECATION_POLICY     = "12 months notice before removal of any Contract method"
+MIGRATION_GUIDE        = "docs/migration/secrets_5_0.md"
+
+
+4.14 SchedulerCapability
+# octopussy/capabilities/scheduler/contract.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from uuid import UUID
+
+
+class SchedulerContract(ABC):
+    """
+    Provisions (interfaces this Capability provides to others):
+    - schedule_agent: register an agent for cron-based execution
+    - unschedule_agent: remove an agent from the schedule
+    - list_scheduled_agents: list all scheduled agents with next-run times
+    - trigger_now: immediately trigger a scheduled agent (manual override)
+
+    Requirements (interfaces this Capability consumes, injected via inject_dependency()):
+    - ConfigurationCapability → ConfigurationPort
+    - MessagingCapability     → MessagingContract
+    - ObservabilityCapability → ObservabilityPort
+
+    Protocols:
+    - APScheduler ≥3.10 backend.
+    - Cron expressions are validated at schedule_agent() time.
+    - Triggers send OctopussyMessage(type=TASK) to the agent's inQ.
+    - All scheduled triggers are signed with the system HMAC secret.
+    - Timezone is configurable per agent (default: UTC).
+    """
+
+    @abstractmethod
+    async def schedule_agent(self, agent_id: UUID,
+                             cron_expression: str, timezone: str = "UTC") -> None: ...
+
+    @abstractmethod
+    async def unschedule_agent(self, agent_id: UUID) -> None: ...
+
+    @abstractmethod
+    async def list_scheduled_agents(self) -> list[dict]: ...
+
+    @abstractmethod
+    async def trigger_now(self, agent_id: UUID) -> None: ...
+
+    @abstractmethod
+    async def inject_dependency(self) -> None:
+        """CCA Lifecycle Phase 3: inject all required interface references."""
+        ...
+
+
+CAPABILITY_VERSION     = "5.0"
+MINIMUM_CLIENT_VERSION = "4.0"
+DEPRECATION_POLICY     = "12 months notice before removal of any Contract method"
+MIGRATION_GUIDE        = "docs/migration/scheduler_5_0.md"
+
+
+4.15 ObservabilityCapability (Sidecar)
+ObservabilityCapability  [Sidecar]
+│
+├── Essence
+│   ├── TracingEngine          — OpenTelemetry distributed tracing
+│   ├── LoggingEngine          — structured log emission
+│   ├── MetricsEngine          — Prometheus metrics emission
+│   └── AuditEngine            — immutable append-only audit log (JSONL)
+│
+├── Realization
+│   ├── OTLPExporter           — exports traces/metrics to OTLP endpoint
+│   └── PrometheusExporter     — exposes Prometheus metrics (port 9090)
+│
+└── Adaptation
+    └── ObservabilityAdapter   — exposes ObservabilityPort to all Capabilities via DI
+
+# octopussy/capabilities/observability/contract.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from uuid import UUID
+
+
+class ObservabilityContract(ABC):
+    """
+    Provisions (interfaces this Capability provides to others):
+    - start_span: start a distributed trace span
+    - log: emit a structured log entry
+    - metric: emit a metric data point
+    - audit: write an immutable audit log entry
+
+    Requirements (interfaces this Capability consumes, injected via inject_dependency()):
+    - SecretsCapability       → SecretsPort
+    - ConfigurationCapability → ConfigurationPort
+
+    Protocols:
+    - ObservabilityCapability starts as a Sidecar before all other Capabilities.
+    - Every Capability receives ObservabilityPort via inject_dependency().
+    - audit() writes to an append-only JSONL file; entries are never deleted.
+    - Traces exported via OTLP (gRPC or HTTP) to configured endpoint.
+    - Metrics exported via Prometheus HTTP endpoint (port 9090).
+    - All operations are non-blocking (sync or fire-and-forget).
+    """
+
+    @abstractmethod
+    def start_span(self, name: str, trace_id: UUID, attributes: dict) -> object: ...
+
+    @abstractmethod
+    def log(self, level: str, message: str, context: dict) -> None: ...
+
+    @abstractmethod
+    def metric(self, name: str, value: float, labels: dict) -> None: ...
+
+    @abstractmethod
+    def audit(self, event: str, actor: object, resource: str,
+              outcome: str, details: dict) -> None: ...
+
+    @abstractmethod
+    async def inject_dependency(self) -> None:
+        """CCA Lifecycle Phase 3: inject SecretsPort and ConfigurationPort."""
+        ...
+
+
+CAPABILITY_VERSION     = "5.0"
+MINIMUM_CLIENT_VERSION = "4.0"
+DEPRECATION_POLICY     = "12 months notice before removal of any Contract method"
+MIGRATION_GUIDE        = "docs/migration/observability_5_0.md"
+
+
+4.16 PromptEngineCapability
+# octopussy/capabilities/prompt_engine/contract.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+
+
+class PromptEngineContract(ABC):
+    """
+    Provisions (interfaces this Capability provides to others):
+    - render_prompt: render a named prompt template with context variables
+    - list_prompts: list all available prompt templates
+    - validate_prompt: validate a rendered prompt before LLM submission
+
+    Requirements (interfaces this Capability consumes, injected via inject_dependency()):
+    - ConfigurationCapability → ConfigurationPort
+    - PluginCapability        → PluginContract
+    - ObservabilityCapability → ObservabilityPort
+
+    Protocols:
+    - Prompt templates are Markdown files in prompt_catalog_dir.
+    - Templates support variable substitution ({{variable}} syntax).
+    - PROMPT_PATTERN_PLUGIN plugins can add new prompt patterns at runtime.
+    - validate_prompt() checks token length and injection patterns.
+    - All operations are async; no blocking I/O.
+    """
+
+    @abstractmethod
+    async def render_prompt(self, prompt_name: str, context: dict) -> str: ...
+
+    @abstractmethod
+    async def list_prompts(self) -> list[dict]: ...
+
+    @abstractmethod
+    async def validate_prompt(self, prompt: str) -> bool: ...
+
+    @abstractmethod
+    async def inject_dependency(self) -> None:
+        """CCA Lifecycle Phase 3: inject all required interface references."""
+        ...
+
+
+CAPABILITY_VERSION     = "5.0"
+MINIMUM_CLIENT_VERSION = "4.0"
+DEPRECATION_POLICY     = "12 months notice before removal of any Contract method"
+MIGRATION_GUIDE        = "docs/migration/prompt_engine_5_0.md"
+
+
+4.17 UserSessionCapability
+# octopussy/capabilities/user_session/contract.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from uuid import UUID
+
+
+class UserSessionContract(ABC):
+    """
+    Provisions (interfaces this Capability provides to others):
+    - create_session: create a new user session; returns session token
+    - validate_session: validate a session token; return user claims
+    - invalidate_session: invalidate a session (logout)
+    - extend_session: extend session TTL
+
+    Requirements (interfaces this Capability consumes, injected via inject_dependency()):
+    - ConfigurationCapability → ConfigurationPort
+    - SecurityCapability      → SecurityPort
+    - ObservabilityCapability → ObservabilityPort
+
+    Protocols:
+    - Session tokens are JWT-signed (RS256).
+    - Session TTL is configurable (default: 8 hours).
+    - Sessions are stored in Redis (production) or SQLite (local/SBC).
+    - validate_session() verifies JWT signature and expiry.
+    - All operations are async; no blocking I/O.
+    """
+
+    @abstractmethod
+    async def create_session(self, user_id: UUID, role: str) -> str: ...
+
+    @abstractmethod
+    async def validate_session(self, token: str) -> dict: ...
+
+    @abstractmethod
+    async def invalidate_session(self, token: str) -> None: ...
+
+    @abstractmethod
+    async def extend_session(self, token: str) -> str: ...
+
+    @abstractmethod
+    async def inject_dependency(self) -> None:
+        """CCA Lifecycle Phase 3: inject all required interface references."""
+        ...
+
+
+CAPABILITY_VERSION     = "5.0"
+MINIMUM_CLIENT_VERSION = "4.0"
+DEPRECATION_POLICY     = "12 months notice before removal of any Contract method"
+MIGRATION_GUIDE        = "docs/migration/user_session_5_0.md"
+
+
+4.18 WebUICapability
+# octopussy/capabilities/webui/contract.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+
+
+class WebUIContract(ABC):
+    """
+    Provisions (interfaces this Capability provides to others):
+    - get_dashboard_data: return aggregated dashboard data
+    - start: start the web UI server
+    - stop: stop the web UI server
+
+    Requirements (interfaces this Capability consumes, injected via inject_dependency()):
+    - OrchestratorCapability  → OrchestratorContract
+    - UserSessionCapability   → UserSessionContract
+    - ObservabilityCapability → ObservabilityPort
+
+    Protocols:
+    - WebUI is served on the REST port (47200) under /ui/.
+    - Real-time updates delivered via WebSocket (WSS, port 47202) using
+      WebSocketCommunicationPort.
+    - All WebUI requests are authenticated via JWT (UserSessionCapability).
+    - All WebUI traffic uses HTTPS (TLS).
+    """
+
+    @abstractmethod
+    async def get_dashboard_data(self) -> dict: ...
+
+    @abstractmethod
+    async def start(self) -> None: ...
+
+    @abstractmethod
+    async def stop(self) -> None: ...
+
+    @abstractmethod
+    async def inject_dependency(self) -> None:
+        """CCA Lifecycle Phase 3: inject all required interface references."""
+        ...
+
+
+CAPABILITY_VERSION     = "5.0"
+MINIMUM_CLIENT_VERSION = "4.0"
+DEPRECATION_POLICY     = "12 months notice before removal of any Contract method"
+MIGRATION_GUIDE        = "docs/migration/webui_5_0.md"
+
+
+4.19 CLICapability
+# octopussy/capabilities/cli/contract.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+
+
+class CLIContract(ABC):
+    """
+    Provisions (interfaces this Capability provides to others):
+    - run: entry point for the Click CLI application
+
+    Requirements (interfaces this Capability consumes, injected via inject_dependency()):
+    - OrchestratorCapability  → OrchestratorContract
+    - ObservabilityCapability → ObservabilityPort
+
+    Protocols:
+    - All CLI commands are authenticated before execution.
+    - Output is formatted with Rich for human readability.
+    - Errors are displayed with full context and suggested remediation.
+    - CLI communicates with OrchestratorCapability via REST (RESTCommunicationPort, port 47200).
+    """
+
+    @abstractmethod
+    def run(self) -> None:
+        """Entry point for the Click CLI application."""
+        ...
+
+    @abstractmethod
+    async def inject_dependency(self) -> None:
+        """CCA Lifecycle Phase 3: inject all required interface references."""
+        ...
+
+
+CAPABILITY_VERSION     = "5.0"
+MINIMUM_CLIENT_VERSION = "4.0"
+DEPRECATION_POLICY     = "12 months notice before removal of any Contract method"
+MIGRATION_GUIDE        = "docs/migration/cli_5_0.md"
+
+CLI Commands:
+# System management
+octopussy start                             # Start the platform
+octopussy stop                              # Stop the platform
+octopussy status                            # System status
+octopussy plugin list                       # List loaded plugins
+octopussy plugin load <plugin_dir>          # Load a plugin
+octopussy plugin reload <plugin_id>         # Hot-reload a plugin
+
+# Agent management
+octopussy agent create <config_dir>         # Create agent from config
+octopussy agent list                        # List running agents
+octopussy agent info <agent_id>             # Get agent info
+octopussy agent stop <agent_id>             # Stop an agent
+
+# Task management
+octopussy task submit <agent_id> <task>     # Submit a task
+octopussy task result <task_id>             # Get task result
+octopussy task list --dlq                   # List DLQ entries
+octopussy task replay <dlq_entry_id>        # Replay a DLQ message
+octopussy task discard <dlq_entry_id>       # Discard a DLQ entry
+
+# Team management
+octopussy team create <team_config_dir>     # Create a team
+octopussy team list                         # List active teams
+octopussy team submit <team_id> <task>      # Submit task to team
+
+# User agent extension (v5.0)
+octopussy agent-ext list                    # List registered user agent types
+octopussy agent-ext load <plugin_dir>       # Load a USER_AGENT_PLUGIN
+octopussy agent-ext unload <agent_type>     # Unregister a user agent type
+
+
+4.20 SpeechCapability
+# octopussy/capabilities/speech/contract.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+
+
+class SpeechContract(ABC):
+    """
+    Provisions (interfaces this Capability provides to others):
+    - transcribe: convert audio bytes to text (STT)
+    - synthesize: convert text to audio bytes (TTS)
+
+    Requirements (interfaces this Capability consumes, injected via inject_dependency()):
+    - ConfigurationCapability → ConfigurationPort
+    - ObservabilityCapability → ObservabilityPort
+
+    Protocols:
+    - STT: OpenAI Whisper (local, in-process); input: WAV/MP3 bytes; output: text string.
+    - TTS: Piper TTS (local, in-process); input: text string; output: WAV bytes.
+    - All operations are async; audio processing runs in asyncio.run_in_executor.
+    - No network access required (fully local inference).
+    """
+
+    @abstractmethod
+    async def transcribe(self, audio_bytes: bytes, language: str = "en") -> str: ...
+
+    @abstractmethod
+    async def synthesize(self, text: str, voice: str = "default") -> bytes: ...
+
+    @abstractmethod
+    async def inject_dependency(self) -> None:
+        """CCA Lifecycle Phase 3: inject all required interface references."""
+        ...
+
+
+CAPABILITY_VERSION     = "5.0"
+MINIMUM_CLIENT_VERSION = "4.0"
+DEPRECATION_POLICY     = "12 months notice before removal of any Contract method"
+MIGRATION_GUIDE        = "docs/migration/speech_5_0.md"
+
+
+4.21 SandboxCapability
+SandboxCapability
+│
+├── Essence
+│   ├── SandboxProvisioner     — creates and configures sandbox environments
+│   └── ResourceLimiter        — enforces CPU/memory/disk/network limits
+│
+├── Realization
+│   ├── DockerSandboxAdapter   — Docker container sandbox (default)
+│   ├── GVisorSandboxAdapter   — gVisor (runsc) sandbox
+│   ├── SeccompSandboxAdapter  — seccomp-BPF sandbox (Linux)
+│   └── MacOSSandboxAdapter    — macOS sandbox-exec sandbox
+│
+└── Adaptation
+    └── SandboxAdapter         — exposes SandboxPort
+
+# octopussy/capabilities/sandbox/contract.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from uuid import UUID
+
+
+class SandboxContract(ABC):
+    """
+    Provisions (interfaces this Capability provides to others):
+    - provision: create a sandbox environment for an agent
+    - execute: execute a command in an agent's sandbox
+    - destroy: destroy an agent's sandbox
+
+    Requirements (interfaces this Capability consumes, injected via inject_dependency()):
+    - ConfigurationCapability → ConfigurationPort
+    - ObservabilityCapability → ObservabilityPort
+
+    Protocols:
+    - Each agent gets its own sandbox (Bulkhead pattern).
+    - Resource limits: CPU (default 1.0 cores), Memory (default 512 MB),
+      Disk (default 1024 MB), Network (default disabled).
+    - All limits are configurable in permissions.md.
+    - Backend selected from config: docker (default), gvisor, seccomp, macos_sandbox.
+    - All operations are async; no blocking I/O.
+
+    Resource limits per sandbox (configurable in permissions.md):
+      CPU:     1.0 cores  (configurable)
+      Memory:  512 MB     (configurable)
+      Disk:    1024 MB    (configurable)
+      Network: Disabled   (configurable; explicit allowlist)
+    """
+
+    @abstractmethod
+    async def provision(self, agent_id: UUID, spec: dict) -> str: ...
+
+    @abstractmethod
+    async def execute(self, agent_id: UUID,
+                      command: list[str], timeout_sec: int = 30) -> dict: ...
+
+    @abstractmethod
+    async def destroy(self, agent_id: UUID) -> None: ...
+
+    @abstractmethod
+    async def inject_dependency(self) -> None:
+        """CCA Lifecycle Phase 3: inject all required interface references."""
+        ...
+
+
+CAPABILITY_VERSION     = "5.0"
+MINIMUM_CLIENT_VERSION = "4.0"
+DEPRECATION_POLICY     = "12 months notice before removal of any Contract method"
+MIGRATION_GUIDE        = "docs/migration/sandbox_5_0.md"
+
+
+4.22 TokenBudgetCapability
+# octopussy/capabilities/token_budget/contract.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from uuid import UUID
+
+
+class TokenBudgetContract(ABC):
+    """
+    Provisions (interfaces this Capability provides to others):
+    - check_budget: check whether an agent has remaining budget for a period
+    - record_usage: record token usage for an agent
+    - get_usage_report: retrieve usage report for an agent
+    - reset_budget: reset budget for an agent (admin operation)
+
+    Requirements (interfaces this Capability consumes, injected via inject_dependency()):
+    - ConfigurationCapability → ConfigurationPort
+    - ObservabilityCapability → ObservabilityPort
+
+    Protocols:
+    - Budget periods: hourly, daily, monthly.
+    - check_budget() returns False if any period limit is exceeded.
+    - record_usage() accumulates input + output tokens.
+    - BudgetStore persists usage data (SQLite default, Redis optional).
+    - All operations are async; no blocking I/O.
+    """
+
+    @abstractmethod
+    async def check_budget(self, agent_id: UUID, period: str) -> bool: ...
+
+    @abstractmethod
+    async def record_usage(self, agent_id: UUID,
+                           input_tokens: int, output_tokens: int) -> None: ...
+
+    @abstractmethod
+    async def get_usage_report(self, agent_id: UUID) -> dict: ...
+
+    @abstractmethod
+    async def reset_budget(self, agent_id: UUID, period: str) -> None: ...
+
+    @abstractmethod
+    async def inject_dependency(self) -> None:
+        """CCA Lifecycle Phase 3: inject all required interface references."""
+        ...
+
+
+CAPABILITY_VERSION     = "5.0"
+MINIMUM_CLIENT_VERSION = "4.0"
+DEPRECATION_POLICY     = "12 months notice before removal of any Contract method"
+MIGRATION_GUIDE        = "docs/migration/token_budget_5_0.md"
+
+
+4.23 CritiqueCapability
+# octopussy/capabilities/critique/contract.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+
+
+class CritiqueContract(ABC):
+    """
+    Provisions (interfaces this Capability provides to others):
+    - critique: evaluate an agent output for quality and policy compliance
+    - request_revision: request a revised output from the originating agent
+
+    Requirements (interfaces this Capability consumes, injected via inject_dependency()):
+    - LLMRouterCapability     → LLMRouterContract
+    - ObservabilityCapability → ObservabilityPort
+
+    Protocols:
+    - critique() uses a dedicated LLM (configured separately from agent LLM).
+    - Quality threshold is configurable (default: 0.8 on a 0.0–1.0 scale).
+    - If quality < threshold, request_revision() sends a TASK message back to the agent.
+    - Maximum revision rounds: configurable (default: 3).
+    - All LLM calls use the resolved LLMPort from LLMRouterCapability.
+    - All operations are async; no blocking I/O.
+    """
+
+    @abstractmethod
+    async def critique(self, output: str, policy: str, agent_id: str) -> dict: ...
+
+    @abstractmethod
+    async def request_revision(self, agent_id: str, critique_result: dict) -> None: ...
+
+    @abstractmethod
+    async def inject_dependency(self) -> None:
+        """CCA Lifecycle Phase 3: inject all required interface references."""
+        ...
+
+
+CAPABILITY_VERSION     = "5.0"
+MINIMUM_CLIENT_VERSION = "4.0"
+DEPRECATION_POLICY     = "12 months notice before removal of any Contract method"
+MIGRATION_GUIDE        = "docs/migration/critique_5_0.md"
+
+
+4.24 AgentLifecycleManagerCapability
+# octopussy/capabilities/agent_lifecycle/contract.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+from uuid import UUID
+
+from octopussy.core.enums import AgentState
+
+
+class AgentLifecycleContract(ABC):
+    """
+    Provisions (interfaces this Capability provides to others):
+    - register_agent: register a new agent in the lifecycle registry
+    - transition_state: enforce a state machine transition
+    - get_state: retrieve current state of an agent
+    - record_heartbeat: record a heartbeat from an agent
+    - deregister_agent: remove an agent from the registry
+
+    Requirements (interfaces this Capability consumes, injected via inject_dependency()):
+    - ConfigurationCapability → ConfigurationPort
+    - ObservabilityCapability → ObservabilityPort
+
+    Protocols:
+    - transition_state() validates the transition against the state machine.
+    - Invalid transitions raise InvalidStateTransitionError.
+    - HealthMonitor detects agents that miss heartbeats (> 2x interval = 60 seconds).
+    - Unhealthy agents are transitioned to ERROR state automatically.
+    - Valid state transitions:
+        CREATED    → IDLE
+        IDLE       → PROCESSING | PAUSED | STOPPING
+        PROCESSING → IDLE | ERROR | STOPPING
+        PAUSED     → IDLE | STOPPING
+        STOPPING   → STOPPED
+        ERROR      → STOPPING | IDLE (after recovery)
+        STOPPED    → (terminal)
+    """
+
+    @abstractmethod
+    async def register_agent(self, agent_id: UUID, name: str) -> None: ...
+
+    @abstractmethod
+    async def transition_state(self, agent_id: UUID, new_state: AgentState) -> None: ...
+
+    @abstractmethod
+    async def get_state(self, agent_id: UUID) -> AgentState: ...
+
+    @abstractmethod
+    async def record_heartbeat(self, agent_id: UUID) -> None: ...
+
+    @abstractmethod
+    async def deregister_agent(self, agent_id: UUID) -> None: ...
+
+    @abstractmethod
+    async def inject_dependency(self) -> None:
+        """CCA Lifecycle Phase 3: inject all required interface references."""
+        ...
+
+
+CAPABILITY_VERSION     = "5.0"
+MINIMUM_CLIENT_VERSION = "4.0"
+DEPRECATION_POLICY     = "12 months notice before removal of any Contract method"
+MIGRATION_GUIDE        = "docs/migration/agent_lifecycle_5_0.md"
+
+
+4.25 ConfigurationCapability
+# octopussy/capabilities/configuration/contract.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+
+
+class ConfigurationContract(ABC):
+    """
+    Provisions (interfaces this Capability provides to others):
+    - get: retrieve a configuration value by dot-notation key
+    - get_section: retrieve an entire configuration section as a dict
+    - reload: hot-reload configuration from disk
+
+    Requirements (interfaces this Capability consumes, injected via inject_dependency()):
+    - SecretsCapability → SecretsPort
+
+    Protocols:
+    - Configuration is loaded from /etc/octopussy/config/octopussy.yaml at startup.
+    - Schema version is validated on load; mismatches raise ConfigurationError.
+    - FileWatcher (watchfiles) monitors config files for changes.
+    - On change detection, reload() is called and dependent Capabilities are notified.
+    - Secret references in config (e.g., neo4j_password_secret) are resolved via SecretsCapability.
+    - All operations are async; no blocking I/O.
+    """
+
+    @abstractmethod
+    async def get(self, key: str, default: object = None) -> object: ...
+
+    @abstractmethod
+    async def get_section(self, section: str) -> dict: ...
+
+    @abstractmethod
+    async def reload(self) -> None: ...
+
+    @abstractmethod
+    async def inject_dependency(self) -> None:
+        """CCA Lifecycle Phase 3: inject SecretsPort."""
+        ...
+
+
+CAPABILITY_VERSION     = "5.0"
+MINIMUM_CLIENT_VERSION = "4.0"
+DEPRECATION_POLICY     = "12 months notice before removal of any Contract method"
+MIGRATION_GUIDE        = "docs/migration/configuration_5_0.md"
+
+
+4.26 UserAgentExtensionCapability (New in v5.0)
+Purpose: Provides the runtime registry for user-created agent classes. Enables users to register, load, and run their own OctopussyAgent subclasses without modifying core platform code. Integrates with PluginCapability (via USER_AGENT_PLUGIN) and with AgentFactoryCapability (via UserAgentRegistryPort).
+UserAgentExtensionCapability
+│
+├── Essence
+│   ├── UserAgentRegistry      — registry of user-defined agent classes
+│   │                            keyed by agent_type string
+│   ├── AgentClassValidator    — validates that registered class is a proper
+│   │                            OctopussyAgent subclass with correct signature
+│   └── AgentClassLoader       — dynamically imports agent classes from
+│                                USER_AGENT_PLUGIN plugin packages
+│
+├── Realization
+│   ├── UserAgentRegistryStore — persists registered agent type metadata (SQLite)
+│   └── PluginModuleImporter   — imports Python modules from plugin directories
+│
+└── Adaptation
+    └── UserAgentExtensionAdapter — implements UserAgentRegistryPort
+
+# octopussy/capabilities/user_agent_extension/contract.py
+
+from __future__ import annotations
+from abc import ABC, abstractmethod
+
+
+class UserAgentExtensionContract(ABC):
+    """
+    Provisions (interfaces this Capability provides to others):
+    - register_agent_class: register a user-defined OctopussyAgent subclass
+    - resolve_agent_class: resolve a registered agent class by agent_type string
+    - unregister_agent_class: unregister a user-defined agent class
+    - list_registered_agents: list all registered user-defined agent classes
+
+    Requirements (interfaces this Capability consumes, injected via inject_dependency()):
+    - PluginCapability        → PluginContract
+    - ObservabilityCapability → ObservabilityPort
+
+    Protocols:
+    - register_agent_class() validates that the class is a proper OctopussyAgent subclass.
+    - Raises UserAgentRegistrationError if:
+        * agent_class does not subclass OctopussyAgent
+        * agent_type is already registered
+        * agent_class does not implement process_task() and _dispatch_outbound()
+    - resolve_agent_class() raises UserAgentNotFoundError if agent_type is not registered.
+    - unregister_agent_class() does not affect already-running instances of that class.
+    - USER_AGENT_PLUGIN plugins call register_agent_class() during their load_plugin() hook.
+    - All registered agent types are available to AgentFactoryCapability via
+      UserAgentRegistryPort (injected into AgentFactoryCapability by OCLM).
+    - All operations are async; no blocking I/O.
+    - Registered agent type metadata is persisted in SQLite and survives restarts.
+    """
+
+    @abstractmethod
+    async def register_agent_class(
+        self,
+        agent_type: str,
+        agent_class: type,
+        description: str = "",
+        schema_version: str = "5.0",
+    ) -> None: ...
+
+    @abstractmethod
+    async def resolve_agent_class(self, agent_type: str) -> type: ...
+
+    @abstractmethod
+    async def unregister_agent_class(self, agent_type: str) -> None: ...
+
+    @abstractmethod
+    async def list_registered_agents(self) -> list[dict]: ...
+
+    @abstractmethod
+    async def inject_dependency(self) -> None:
+        """CCA Lifecycle Phase 3: inject all required interface references."""
+        ...
+
+
+CAPABILITY_VERSION     = "5.0"
+MINIMUM_CLIENT_VERSION = "5.0"
+DEPRECATION_POLICY     = "12 months notice before removal of any Contract method"
+MIGRATION_GUIDE        = "docs/migration/user_agent_extension_5_0.md"
+
+User Agent Plugin Specification:
+# Example: my_custom_agents/plugin.json
+# {
+#   "plugin_id": "my_research_agent",
+#   "plugin_type": "USER_AGENT_PLUGIN",
+#   "version": "1.0.0",
+#   "entry_module": "my_custom_agents.research_agent",
+#   "agent_type": "research_agent",
+#   "agent_class": "ResearchAgent",
+#   "description": "A specialized research agent that queries academic databases.",
+#   "schema_version": "5.0"
+# }
+
+# Example: my_custom_agents/research_agent.py
+
+from __future__ import annotations
+from typing import Any
+from octopussy.capabilities.actor.essence.agent_base import OctopussyAgent
+from octopussy.core.message import OctopussyMessage
+
+
+class ResearchAgent(OctopussyAgent):
+    """
+    User-defined research agent.
+    Subclasses OctopussyAgent; all security, lifecycle, and messaging
+    guarantees are inherited automatically.
+    """
+
+    async def process_task(self, message: OctopussyMessage) -> Any:
+        """
+        Custom task processing logic.
+        All inherited security checks (signature, TTL, injection scan,
+        budget check, LoopGuard) have already passed before this is called.
+        """
+        task_text = message.payload.get("task", "")
+
+        # Use injected LLM port
+        from octopussy.core.ports.llm_ports import LLMRequest
+        request = LLMRequest(
+            messages=({"role": "user", "content": task_text},),
+            model=self._spec.intelligence.model,
+            system=self._spec.persona,
+        )
+        completion = await self._llm_port.complete(request)
+        await self._token_budget.record_usage(
+            self._agent_id,
+            completion.input_tokens,
+            completion.output_tokens,
+        )
+
+        # Optionally use RAG
+        if self._rag and self._spec.rag:
+            chunks = await self._rag.retrieve(
+                self._spec.rag.collection_name, task_text, top_k=self._spec.rag.top_k
+            )
+            # ... incorporate chunks into response
+
+        return {"result": completion.content}
+
+    async def _dispatch_outbound(self, message: OctopussyMessage) -> None:
+        """Forward outbound messages via MessagingCapability."""
+        # MessagingCapability is injected via inject_dependency() into ActorCapability
+        # and is accessible here as self._messaging (set by AgentFactoryCapability)
+        pass
+
+Loading a User Agent Plugin:
+# Via CLI
+octopussy plugin load ./my_custom_agents/
+
+# Via Python API
+await plugin_capability.load_plugin("./my_custom_agents/")
+
+# Creating an agent of the user-defined type (via config file)
+# my_research_agent_config/agent.md:
+#   agent_type: USER_DEFINED
+#   user_agent_type: research_agent
+#   ...
+
+octopussy agent create ./my_research_agent_config/
+
+
+5. BUILT-IN TOOLS CATALOGUE
+All tools are registered in ToolRegistryCapability at startup, executed in a sandboxed subprocess via SandboxCapability, and subject to per-agent permission enforcement via PermissionsSpec.allowed_tools / forbidden_tools. All tool calls are routed exclusively through MCP 2025-11-25 Streamable HTTP transport via MCPClientAdapter. LLM-dependent tool calling mechanisms are not used.
+5.1 Tool Overview
+
+
+
+Tool ID
+Category
+Description
+Sandbox Required
+Network Required
+
+
+
+web_search
+Web
+Web search via configurable search API
+Yes
+Yes
+
+
+web_download
+Web
+Download and parse web pages (HTML → text)
+Yes
+Yes
+
+
+file_read
+File System
+Read files from allowed paths
+Yes
+No
+
+
+file_write
+File System
+Write files to allowed paths
+Yes
+No
+
+
+file_list
+File System
+List directory contents
+Yes
+No
+
+
+file_delete
+File System
+Delete files from allowed paths
+Yes
+No
+
+
+os_command
+System
+Execute OS shell commands (restricted allowlist)
+Yes
+No
+
+
+python_exec
+System
+Execute Python code in isolated subprocess
+Yes
+No
+
+
+memory_store
+Memory
+Store a key-value entry in agent memory
+No
+No
+
+
+memory_retrieve
+Memory
+Retrieve a value from agent memory
+No
+No
+
+
+memory_search
+Memory
+Semantic search over agent memory
+No
+No
+
+
+rag_ingest
+RAG
+Ingest documents into agent's RAG collection
+No
+No
+
+
+rag_retrieve
+RAG
+Retrieve relevant chunks from RAG collection
+No
+No
+
+
+graph_query
+Graph
+Execute a graph query
+No
+No
+
+
+graph_upsert
+Graph
+Upsert a node or edge in the graph
+No
+No
+
+
+mail_send
+Communication
+Send an email via configured SMTP
+Yes
+Yes
+
+
+calendar_write
+Communication
+Write a calendar event
+Yes
+Yes
+
+
+ui_automation
+UI
+Automate UI interactions (Playwright)
+Yes
+No
+
+
+speech_transcribe
+Speech
+Transcribe audio to text
+No
+No
+
+
+speech_synthesize
+Speech
+Synthesize text to audio
+No
+No
+
+
+5.2 Tool Registration at Startup
+All built-in tools are registered in ToolRegistryCapability during the start() phase. Each tool is registered with:
+
+A unique tool_id
+A JSON schema for input validation
+A JSON schema for output validation
+A sandbox requirement flag
+A network requirement flag
+The plugin module path
+
+Custom tools can be added via TOOL_PLUGIN plugins without modifying core code.
+
+6. ACTOR MODEL &amp; AGENT ARCHITECTURE
+OctopussyAgent (ABC)
+│
+├── StatelessOneShot          — executes once, returns result, terminates
+├── StatefulLoop              — executes repeatedly until stopped; maintains state
+├── ScheduledTaskDaemon       — wakes on cron schedule; executes; sleeps
+└── [UserDefinedAgent]        — any user-registered subclass of OctopussyAgent
+
+Each agent instance has:
+
+inQ (asyncio.PriorityQueue) — receives inbound OctopussyMessage instances, ordered by MessagePriority (CRITICAL=0 processed first, then HIGH=1, NORMAL=2, LOW=3)
+outQ (asyncio.PriorityQueue) — holds outbound OctopussyMessage instances, ordered by MessagePriority (CRITICAL=0 dispatched first, then HIGH=1, NORMAL=2, LOW=3)
+A dedicated _message_loop() asyncio task consuming from inQ
+A dedicated _outbound_dispatch_loop() asyncio task consuming from outQ and forwarding to MessagingCapability
+A dedicated _heartbeat_loop() asyncio task emitting heartbeats every 30 seconds
+An AgentStateMachine enforcing valid state transitions
+A LoopGuard enforcing the iteration ceiling
+
+Agent State Machine:
+CREATED → IDLE → PROCESSING → IDLE
+                ↘ ERROR → STOPPING → STOPPED
+IDLE → PAUSED → IDLE
+IDLE → STOPPING → STOPPED
+
+
+7. TEAM PATTERNS &amp; MULTI-AGENT ARCHITECTURE
+
+
+
+Pattern
+Description
+Engine
+
+
+
+Coordinator/Worker
+Coordinator delegates subtasks to workers; synthesizes results
+CoordinatorWorkerEngine
+
+
+Pipeline
+Sequential: output of Agent N is input to Agent N+1
+PipelineEngine
+
+
+Mesh + Blackboard
+Peer-to-peer; shared blackboard for knowledge exchange
+MeshBlackboardEngine
+
+
+Tree
+Hierarchical; parent delegates to children recursively
+TreeEngine
+
+
+Team configuration example (YAML):
+# team_config/team.yaml
+team_id: "auto-generated"
+name: "research_team"
+pattern: "coordinator"
+agents:
+  - config_dir: "./coordinator_agent/"
+  - config_dir: "./researcher_agent_1/"
+  - config_dir: "./researcher_agent_2/"
+execution:
+  max_rounds: 3
+  result_synthesis: "coordinator"
+  timeout_seconds: 600
+
+
+8. MESSAGING ARCHITECTURE
+All inter-agent and inter-Capability communication uses OctopussyMessage exclusively. No direct method calls between agents.
+Sender Agent
+│
+│  OctopussyMessage.create(secret=hmac_secret)
+▼
+outQ (asyncio.PriorityQueue — CRITICAL=0 dispatched first → HIGH → NORMAL → LOW)
+│
+▼
+OutboundQueueAdapter (_outbound_dispatch_loop)
+│
+▼
+MessagingCapability (NATS.io bus — NATSCommunicationPort, nats://host:4222)
+│                   (or RabbitMQ — RabbitMQCommunicationPort, amqp://host:5672)
+│
+▼  (route by recipient_id)
+InboundQueueAdapter
+│
+▼
+inQ (asyncio.PriorityQueue — CRITICAL=0 processed first → HIGH → NORMAL → LOW)
+│
+▼
+OctopussyAgent._message_loop()
+│
+├── verify_signature()       → drop if invalid (HMAC-SHA256)
+├── is_expired()             → drop if expired (TTL check)
+├── CONTROL                  → _handle_control()
+├── scan_prompt()            → drop if injection detected
+├── check_budget()           → drop if exhausted
+└── process_task()           → result → outQ
+
+Dead Letter Queue (DLQ) — Normative Specification:
+The DLQ stores every message that could not be delivered to its recipient after 3 consecutive delivery attempts. No message is ever silently discarded. Every DLQ entry contains: the full original OctopussyMessage, the failure reason, the attempt count, and the timestamp of the last failure. DLQ entries are persisted in SQLite (dlq_store.py) and survive system restarts.
+
+9. LLM/VLM PORT ARCHITECTURE
+LLMRouterCapability
+│
+├── RoutingEngine (Strategy pattern)
+│   ├── COST     — minimize cost; prefer cheaper providers
+│   ├── QUALITY  — maximize quality; prefer best models
+│   ├── BALANCED — balance cost and quality
+│   ├── LOCAL    — prefer local providers (Ollama, LMStudio, vLLM, SGLang, HF, MLX)
+│   └── CLOUD    — prefer cloud providers (OpenAI, Anthropic, Gemini, Bedrock, Azure)
+│
+├── HealthChecker — polls all providers; marks unhealthy providers
+├── FallbackChainResolver — primary → fallback → LLMProviderError
+└── GPUDetector — CUDA / Metal / ROCm detection
+
+
+10. SECURITY ARCHITECTURE
+10.1 Zero-Trust Enforcement Chain
+Inbound request (REST/gRPC/WebSocket/Channel)
+│
+├── mTLS verification (transport layer — RESTCommunicationPort / GRPCCommunicationPort)
+├── JWT authentication (bearer token — SecurityCapability.authenticate())
+├── TOTP verification (SUPERUSER/ADMIN roles — SecurityCapability)
+├── RBAC authorization (deny-by-default — SecurityCapability.authorize())
+│
+▼
+OctopussyMessage
+│
+├── HMAC-SHA256 signature verification (OctopussyMessage.verify_signature())
+├── TTL check (OctopussyMessage.is_expired())
+├── Prompt injection scan (SecurityCapability.scan_prompt())
+│
+▼
+Agent processing
+│
+├── Tool permission check (allowlist — ToolRegistryCapability)
+├── Sandbox execution (Bulkhead — SandboxCapability)
+│
+▼
+Agent output
+│
+├── Guardrail validation (SecurityCapability.validate_output())
+└── HMAC-SHA256 signature on response (OctopussyMessage.create())
+
+10.2 HMAC Signing
+Every OctopussyMessage carries a mandatory HMAC-SHA256 signature (bytes, never Optional[bytes]). Comparison uses hmac.compare_digest() (constant-time, prevents timing attacks). Key rotation is supported via SecretsCapability.rotate_secret().
+10.3 Sandbox Isolation (Bulkhead Pattern)
+Each agent gets its own sandbox. Tool execution is isolated per agent. A misbehaving tool in Agent A cannot affect Agent B or the host system.
+
+
+
+Resource
+Default
+Configurable
+
+
+
+CPU
+1.0 cores
+Yes
+
+
+Memory
+512 MB
+Yes
+
+
+Disk
+1024 MB
+Yes
+
+
+Network
+Disabled
+Yes (explicit allowlist)
+
+
+
+11. MCP INTEGRATION ARCHITECTURE (2025-11-25)
+All tool calls are routed exclusively through MCP 2025-11-25 Streamable HTTP transport. LLM-dependent tool calling mechanisms are not used.
+OctopussyAgent
+│
+└── MCPClientAdapter
+    │
+    ├── Validates MCP-Protocol-Version: 2025-11-25 on all requests
+    ├── Sends tool call requests via Streamable HTTP POST
+    ├── Streams responses via SSE (Server-Sent Events)
+    └── Routes to:
+        ├── OctopussyMCPServer (built-in tools — PluginCapability)
+        └── External MCP Servers (per MCPServerSpec in AgentSpec)
+
+
+12. DEPLOYMENT ARCHITECTURE
+
+
+
+Profile
+Target
+Configuration
+
+
+
+SBC
+Raspberry Pi, Jetson Nano
+SQLite, InMemoryBus, local LLM only
+
+
+LOCAL
+Developer workstation
+SQLite, InMemoryBus or NATS, local+cloud LLM
+
+
+DOCKER
+Docker Compose
+PostgreSQL, NATS, Redis, all LLMs
+
+
+KUBERNETES
+Production cluster
+PostgreSQL, NATS cluster, Redis cluster, all LLMs
+
+
+
+13. CONFIGURATION FILE SCHEMA
+# /etc/octopussy/config/octopussy.yaml
+schema_version: "5.0"
+deployment_profile: "LOCAL"   # SBC | LOCAL | DOCKER | KUBERNETES
+
+messaging:
+  backend: "nats"             # nats | rabbitmq | in_memory
+  nats_url: "nats://localhost:4222"
+  # rabbitmq_url_secret: "rabbitmq_url"
+
+llm:
+  routing_strategy: "BALANCED"
+  routing_table: "/etc/octopussy/config/routing_table.yaml"
+
+memory:
+  backend: "sqlite"           # sqlite | redis | postgresql
+  sqlite_path: "/var/octopussy/memory.db"
+
+rag:
+  backend: "chromadb"         # chromadb | pgvector | weaviate | qdrant | milvus | plugin
+  chromadb_host: "localhost"
+  chromadb_port: 8000
+
+graph_rag:
+  backend: "neo4j"            # neo4j | arangodb | tigergraph | plugin
+  neo4j_url: "bolt://localhost:7687"
+  neo4j_user: "neo4j"
+  neo4j_password_secret: "neo4j_password"
+
+sandbox:
+  backend: "docker"           # docker | gvisor | seccomp | macos_sandbox
+
+observability:
+  otlp_endpoint: "http://localhost:4317"
+  prometheus_port: 9090
+
+security:
+  jwt_secret_name: "jwt_secret"
+  hmac_secret_name: "hmac_secret"
+  totp_required_roles: ["SUPERUSER", "ADMIN"]
+
+user_agent_extension:
+  plugin_dirs: []             # List of USER_AGENT_PLUGIN directories to load at startup
+
+
+14. PLUGIN ARCHITECTURE
+Plugin Types
+
+
+
+Plugin Type
+Purpose
+
+
+
+TOOL_PLUGIN
+Add new tools to ToolRegistryCapability
+
+
+LLM_ADAPTER_PLUGIN
+Add new LLM provider adapters
+
+
+VLM_ADAPTER_PLUGIN
+Add new VLM provider adapters
+
+
+COMM_ADAPTER_PLUGIN
+Add new communication channel adapters
+
+
+VECTOR_DB_PLUGIN
+Add new vector database backends
+
+
+GRAPH_DB_PLUGIN
+Add new graph database backends
+
+
+MCP_SERVER_PLUGIN
+Register new MCP server endpoints
+
+
+INFERENCE_ENGINE_PLUGIN
+Add new local inference engine backends
+
+
+PROMPT_PATTERN_PLUGIN
+Add new prompt patterns to PromptEngineCapability
+
+
+USER_AGENT_PLUGIN
+Register user-defined OctopussyAgent subclasses (new in v5.0)
+
+
+Plugin Manifest (plugin.json)
+{
+  "plugin_id": "my_plugin",
+  "plugin_type": "USER_AGENT_PLUGIN",
+  "version": "1.0.0",
+  "entry_module": "my_package.my_module",
+  "agent_type": "my_custom_agent",
+  "agent_class": "MyCustomAgent",
+  "description": "A user-defined agent for specialized tasks.",
+  "schema_version": "5.0",
+  "min_octopussy_version": "5.0"
+}
+
+Plugin Lifecycle
+load_plugin(plugin_dir)
+│
+├── validate plugin.json schema
+├── import entry_module
+├── for USER_AGENT_PLUGIN:
+│   └── UserAgentExtensionCapability.register_agent_class(agent_type, agent_class)
+├── for TOOL_PLUGIN:
+│   └── ToolRegistryCapability.register_tool(descriptor)
+└── register in PluginRegistry
+
+
+15. DESIGN PATTERNS REFERENCE MATRIX
+
+
+
+Pattern
+Category
+Applied In
+Purpose
+
+
+
+Actor Model
+Behavioral
+OctopussyAgent
+Message-passing concurrency; no shared state
+
+
+State Machine
+Behavioral
+AgentStateMachine
+Strict, validated state transitions
+
+
+Chain of Responsibility
+Behavioral
+OctopussyAgent._message_loop()
+Ordered message processing pipeline
+
+
+Template Method
+Behavioral
+OctopussyAgent._message_loop()
+Fixed algorithm; subclasses override process_task()
+
+
+Strategy
+Behavioral
+LLMRouterCapability.RoutingEngine
+Pluggable routing strategies
+
+
+Observer
+Behavioral
+ConfigurationCapability.FileWatcher
+Config change notifications
+
+
+Command
+Behavioral
+OctopussyMessage (CONTROL type)
+Encapsulated control commands
+
+
+Mediator
+Behavioral
+MessagingCapability
+Decoupled inter-agent communication
+
+
+Abstract Factory
+Creational
+CapabilityFactory, AgentFactoryCapability
+Decouple creation from lifecycle
+
+
+Builder
+Creational
+AgentSpecBuilder
+Step-by-step AgentSpec construction
+
+
+Factory Method
+Creational
+OctopussyMessage.create()
+Controlled message creation with signature
+
+
+Prototype
+Creational
+AgentSpec (frozen dataclass clone)
+Immutable spec reuse
+
+
+Sidecar
+Structural
+ObservabilityCapability
+Independent cross-cutting concern
+
+
+Adapter
+Structural
+All *Adapter classes
+Interface translation
+
+
+Circuit Breaker
+Resilience
+LLMPortAdapter, VLMPortAdapter
+Resilience for external LLM calls
+
+
+Retry + Backoff
+Resilience
+LLMPortAdapter
+Transient failure recovery
+
+
+Bulkhead
+Resilience
+SandboxCapability
+Agent isolation prevents cascade failures
+
+
+Dead Letter Queue
+Resilience
+MessagingCapability
+Failed message capture and replay
+
+
+Timeout
+Resilience
+All external calls
+Prevent indefinite blocking
+
+
+Plugin
+Extensibility
+PluginCapability
+Runtime extensibility without restart
+
+
+Repository
+Extensibility
+All *Store classes
+Persistence abstraction
+
+
+Publish/Subscribe
+Extensibility
+MessagingCapability (NATS/RabbitMQ)
+Decoupled event distribution
+
+
+ReAct
+Agentic
+ReflectionEngine
+Reasoning + Acting loop
+
+
+Plan-and-Execute
+Agentic
+PromptEngineCapability
+Complex multi-step tasks
+
+
+Reflection
+Agentic
+ReflectionEngine
+Self-critique and improvement
+
+
+Critique-and-Revise
+Agentic
+CritiqueCapability
+Output quality enforcement
+
+
+Blackboard
+Agentic
+MeshBlackboardEngine
+Shared knowledge for mesh teams
+
+
+
+16. QUALITY ATTRIBUTE REALIZATION
+
+
+
+Quality Attribute
+Mechanism
+Target
+
+
+
+Performance
+Async everywhere; asyncio.PriorityQueue for both inQ and outQ; NATS.io bus; Redis cache
+Task latency p99 < 5s (local LLM); p99 < 2s (cloud LLM)
+
+
+Reliability
+Circuit breaker; retry+backoff; DLQ (persisted, never silent discard); health monitor; graceful shutdown
+Agent uptime > 99.9%; zero message loss under normal conditions
+
+
+Security
+Zero-trust; HMAC-SHA256; mTLS; RBAC; prompt injection scanning; guardrails; sandbox
+100% messages signed; 100% prompts scanned; 0 unsigned messages processed
+
+
+Scalability
+Kubernetes deployment; NATS.io clustering; stateless agents; horizontal scaling
+Linear throughput scaling with replica count
+
+
+Observability
+OpenTelemetry sidecar; Prometheus metrics; distributed tracing; immutable audit log
+100% of operations traced; all metrics exported
+
+
+Extensibility
+Plugin architecture; hot-reload; 10 plugin types; MCP 2025-11-25; user agent extension framework
+New plugin or user agent loaded without restart; zero core changes required
+
+
+Portability
+Deployment profiles (SBC/LOCAL/DOCKER/KUBERNETES); same config everywhere
+Same agent definitions run on Raspberry Pi and Kubernetes unchanged
+
+
+User Extensibility
+UserAgentExtensionCapability; USER_AGENT_PLUGIN; AgentType.USER_DEFINED
+User agents registered, loaded, and run without modifying core platform code
+
+
+
+17. IMPLEMENTATION SKELETON
+17.1 Project Directory Structure
+octopussy/
+├── pyproject.toml
+├── README.md
+├── LICENSE
+│
+├── octopussy/
+│   ├── __init__.py
+│   ├── main.py                          # Entry point: asyncio.run(main())
+│   │
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── enums.py                     # All StrEnum / IntEnum definitions
+│   │   ├── message.py                   # OctopussyMessage (frozen dataclass)
+│   │   ├── registry.py                  # OctopussyCapabilityRegistry
+│   │   ├── lifecycle_manager.py         # OctopussyCapabilityLifecycleManager (OCLM)
+│   │   ├── capability_factory.py        # CapabilityFactory
+│   │   │
+│   │   ├── models/
+│   │   │   ├── agent_spec.py            # AgentSpec, TeamSpec, all config dataclasses
+│   │   │   └── agent_info.py            # AgentInfo, AgentHandle, TaskHandle, TeamHandle
+│   │   │
+│   │   └── ports/
+│   │       ├── ports.py                 # Core port interfaces
+│   │       ├── llm_ports.py             # LLMPort, VLMPort + all concrete implementations
+│   │       ├── rag_ports.py             # RAGPort + all concrete implementations
+│   │       ├── graph_ports.py           # GraphPort + all concrete implementations
+│   │       ├── communication_ports.py   # All CommunicationPort implementations
+│   │       └── dlq_port.py              # DLQPort
+│   │
+│   ├── capabilities/
+│   │   ├── registration.py              # register_all_capabilities()
+│   │   │
+│   │   ├── secrets/
+│   │   │   ├── contract.py
+│   │   │   ├── essence/
+│   │   │   │   └── secret_manager.py
+│   │   │   ├── realization/
+│   │   │   │   ├── local_encrypted_store.py
+│   │   │   │   └── vault_adapter.py
+│   │   │   └── adaptation/
+│   │   │       └── secrets_adapter.py
+│   │   │
+│   │   ├── configuration/
+│   │   │   ├── contract.py
+│   │   │   ├── essence/
+│   │   │   │   ├── config_loader.py
+│   │   │   │   └── file_watcher.py
+│   │   │   └── adaptation/
+│   │   │       └── configuration_adapter.py
+│   │   │
+│   │   ├── observability/
+│   │   │   ├── contract.py
+│   │   │   ├── essence/
+│   │   │   │   ├── tracing_engine.py
+│   │   │   │   ├── logging_engine.py
+│   │   │   │   ├── metrics_engine.py
+│   │   │   │   └── audit_engine.py
+│   │   │   ├── realization/
+│   │   │   │   ├── otlp_exporter.py
+│   │   │   │   └── prometheus_exporter.py
+│   │   │   └── adaptation/
+│   │   │       └── observability_adapter.py
+│   │   │
+│   │   ├── security/
+│   │   │   ├── contract.py
+│   │   │   ├── essence/
+│   │   │   │   ├── jwt_authenticator.py
+│   │   │   │   ├── rbac_engine.py
+│   │   │   │   ├── prompt_scanner.py
+│   │   │   │   └── guardrail_validator.py
+│   │   │   └── adaptation/
+│   │   │       └── security_adapter.py
+│   │   │
+│   │   ├── messaging/
+│   │   │   ├── contract.py
+│   │   │   ├── essence/
+│   │   │   │   ├── message_router.py
+│   │   │   │   ├── dead_letter_queue.py
+│   │   │   │   └── message_validator.py
+│   │   │   ├── realization/
+│   │   │   │   ├── nats_adapter.py
+│   │   │   │   ├── rabbitmq_adapter.py
+│   │   │   │   ├── in_memory_bus_adapter.py
+│   │   │   │   └── dlq_store.py
+│   │   │   └── adaptation/
+│   │   │       └── messaging_adapter.py
+│   │   │
+│   │   ├── plugin/
+│   │   │   ├── contract.py
+│   │   │   ├── essence/
+│   │   │   │   ├── plugin_loader.py
+│   │   │   │   ├── plugin_validator.py
+│   │   │   │   ├── plugin_registry.py
+│   │   │   │   └── hot_reload_manager.py
+│   │   │   ├── realization/
+│   │   │   │   ├── python_module_loader.py
+│   │   │   │   └── plugin_state_store.py
+│   │   │   ├── adaptation/
+│   │   │   │   └── plugin_adapter.py
+│   │   │   └── mcp_server.py            # OctopussyMCPServer (MCP 2025-11-25)
+│   │   │
+│   │   ├── sandbox/
+│   │   │   ├── contract.py
+│   │   │   ├── essence/
+│   │   │   │   ├── sandbox_provisioner.py
+│   │   │   │   └── resource_limiter.py
+│   │   │   ├── realization/
+│   │   │   │   ├── docker_sandbox.py
+│   │   │   │   ├── gvisor_sandbox.py
+│   │   │   │   ├── seccomp_sandbox.py
+│   │   │   │   └── macos_sandbox.py
+│   │   │   └── adaptation/
+│   │   │       └── sandbox_adapter.py
+│   │   │
+│   │   ├── tool_registry/
+│   │   │   ├── contract.py
+│   │   │   ├── essence/
+│   │   │   │   ├── tool_registry.py
+│   │   │   │   ├── permission_checker.py
+│   │   │   │   └── tool_result_validator.py
+│   │   │   ├── realization/
+│   │   │   │   ├── sandboxed_tool_runner.py
+│   │   │   │   └── tool_descriptor_store.py
+│   │   │   └── adaptation/
+│   │   │       └── tool_registry_adapter.py
+│   │   │
+│   │   ├── llm_router/
+│   │   │   ├── contract.py
+│   │   │   ├── essence/
+│   │   │   │   ├── routing_engine.py
+│   │   │   │   ├── health_checker.py
+│   │   │   │   └── fallback_chain_resolver.py
+│   │   │   ├── realization/
+│   │   │   │   ├── routing_table_store.py
+│   │   │   │   └── gpu_detector.py
+│   │   │   └── adaptation/
+│   │   │       └── llm_router_adapter.py
+│   │   │
+│   │   ├── memory/
+│   │   │   ├── contract.py
+│   │   │   ├── essence/
+│   │   │   │   ├── long_term_memory_store.py
+│   │   │   │   └── semantic_memory_search.py
+│   │   │   ├── realization/
+│   │   │   │   ├── sqlite_memory_backend.py
+│   │   │   │   ├── redis_memory_backend.py
+│   │   │   │   ├── postgresql_memory_backend.py
+│   │   │   │   └── embedding_search_engine.py
+│   │   │   └── adaptation/
+│   │   │       └── memory_adapter.py
+│   │   │
+│   │   ├── rag/
+│   │   │   ├── contract.py
+│   │   │   └── adaptation/
+│   │   │       └── rag_adapter.py
+│   │   │
+│   │   ├── graph_rag/
+│   │   │   ├── contract.py
+│   │   │   └── adaptation/
+│   │   │       └── graph_rag_adapter.py
+│   │   │
+│   │   ├── token_budget/
+│   │   │   ├── contract.py
+│   │   │   ├── essence/
+│   │   │   │   ├── budget_enforcer.py
+│   │   │   │   └── usage_accumulator.py
+│   │   │   ├── realization/
+│   │   │   │   └── budget_store.py
+│   │   │   └── adaptation/
+│   │   │       └── token_budget_adapter.py
+│   │   │
+│   │   ├── prompt_engine/
+│   │   │   ├── contract.py
+│   │   │   ├── essence/
+│   │   │   │   ├── prompt_catalog.py
+│   │   │   │   ├── prompt_renderer.py
+│   │   │   │   └── prompt_validator.py
+│   │   │   ├── realization/
+│   │   │   │   └── markdown_prompt_loader.py
+│   │   │   └── adaptation/
+│   │   │       └── prompt_engine_adapter.py
+│   │   │
+│   │   ├── user_agent_extension/          # NEW in v5.0
+│   │   │   ├── contract.py
+│   │   │   ├── essence/
+│   │   │   │   ├── user_agent_registry.py
+│   │   │   │   ├── agent_class_validator.py
+│   │   │   │   └── agent_class_loader.py
+│   │   │   ├── realization/
+│   │   │   │   ├── user_agent_registry_store.py
+│   │   │   │   └── plugin_module_importer.py
+│   │   │   └── adaptation/
+│   │   │       └── user_agent_extension_adapter.py
+│   │   │
+│   │   ├── actor/
+│   │   │   ├── contract.py
+│   │   │   ├── essence/
+│   │   │   │   ├── agent_base.py          # OctopussyAgent ABC
+│   │   │   │   ├── agent_types.py         # StatelessOneShot, StatefulLoop, ScheduledTaskDaemon
+│   │   │   │   ├── agent_state_machine.py
+│   │   │   │   ├── message_dispatcher.py
+│   │   │   │   ├── token_budget_monitor.py
+│   │   │   │   ├── heartbeat_emitter.py
+│   │   │   │   ├── loop_guard.py
+│   │   │   │   ├── conversation_memory.py
+│   │   │   │   └── reflection_engine.py
+│   │   │   ├── realization/
+│   │   │   │   ├── llm_port_adapter.py    # LLMPort + circuit breaker + retry
+│   │   │   │   ├── vlm_port_adapter.py
+│   │   │   │   ├── mcp_client_adapter.py  # MCP 2025-11-25 Streamable HTTP client
+│   │   │   │   └── state_store.py
+│   │   │   └── adaptation/
+│   │   │       └── actor_adapter.py
+│   │   │
+│   │   ├── agent_lifecycle/
+│   │   │   ├── contract.py
+│   │   │   ├── essence/
+│   │   │   │   ├── lifecycle_registry.py
+│   │   │   │   └── health_monitor.py
+│   │   │   └── adaptation/
+│   │   │       └── agent_lifecycle_adapter.py
+│   │   │
+│   │   ├── agent_factory/
+│   │   │   ├── contract.py
+│   │   │   ├── essence/
+│   │   │   │   ├── agent_spec_builder.py
+│   │   │   │   ├── agent_config_validator.py
+│   │   │   │   └── agent_instantiator.py  # delegates to UserAgentRegistryPort for USER_DEFINED
+│   │   │   ├── realization/
+│   │   │   │   ├── markdown_config_parser.py
+│   │   │   │   ├── json_file_reader.py
+│   │   │   │   ├── agent_spec_cache.py
+│   │   │   │   └── configuration_store.py
+│   │   │   └── adaptation/
+│   │   │       └── agent_factory_adapter.py
+│   │   │
+│   │   ├── critique/
+│   │   │   ├── contract.py
+│   │   │   └── adaptation/
+│   │   │       └── critique_adapter.py
+│   │   │
+│   │   ├── scheduler/
+│   │   │   ├── contract.py
+│   │   │   ├── essence/
+│   │   │   │   ├── cron_engine.py
+│   │   │   │   └── task_trigger.py
+│   │   │   ├── realization/
+│   │   │   │   └── apscheduler_adapter.py
+│   │   │   └── adaptation/
+│   │   │       └── scheduler_adapter.py
+│   │   │
+│   │   ├── team/
+│   │   │   ├── contract.py
+│   │   │   ├── essence/
+│   │   │   │   ├── coordinator_worker_engine.py
+│   │   │   │   ├── pipeline_engine.py
+│   │   │   │   ├── mesh_blackboard_engine.py
+│   │   │   │   └── tree_engine.py
+│   │   │   ├── realization/
+│   │   │   │   ├── blackboard_store.py
+│   │   │   │   └── team_state_store.py
+│   │   │   └── adaptation/
+│   │   │       └── team_adapter.py
+│   │   │
+│   │   ├── comm_adapter/
+│   │   │   ├── contract.py
+│   │   │   ├── essence/
+│   │   │   │   ├── channel_registry.py
+│   │   │   │   └── message_bridge.py
+│   │   │   └── adaptation/
+│   │   │       └── comm_adapter_adapter.py
+│   │   │
+│   │   ├── user_session/
+│   │   │   ├── contract.py
+│   │   │   └── adaptation/
+│   │   │       └── user_session_adapter.py
+│   │   │
+│   │   ├── speech/
+│   │   │   ├── contract.py
+│   │   │   └── adaptation/
+│   │   │       └── speech_adapter.py
+│   │   │
+│   │   ├── orchestrator/
+│   │   │   ├── contract.py
+│   │   │   ├── essence/
+│   │   │   │   ├── task_router.py
+│   │   │   │   ├── agent_graph_renderer.py
+│   │   │   │   └── system_status_aggregator.py
+│   │   │   ├── realization/
+│   │   │   │   ├── rest_api_server.py
+│   │   │   │   └── task_result_store.py
+│   │   │   └── adaptation/
+│   │   │       └── orchestrator_adapter.py
+│   │   │
+│   │   ├── cli/
+│   │   │   ├── contract.py
+│   │   │   └── adaptation/
+│   │   │       └── cli_adapter.py
+│   │   │
+│   │   └── webui/
+│   │       ├── contract.py
+│   │       └── adaptation/
+│   │           └── webui_adapter.py
+│   │
+│   └── plugins/
+│       └── tools/
+│           ├── web/
+│           │   ├── web_search_tool.py
+│           │   └── web_download_tool.py
+│           ├── file_ops/
+│           │   ├── file_read_tool.py
+│           │   ├── file_write_tool.py
+│           │   ├── file_list_tool.py
+│           │   └── file_delete_tool.py
+│           ├── system/
+│           │   ├── os_command_tool.py
+│           │   └── python_exec_tool.py
+│           ├── memory/
+│           │   ├── memory_store_tool.py
+│           │   ├── memory_retrieve_tool.py
+│           │   └── memory_search_tool.py
+│           ├── rag/
+│           │   ├── rag_ingest_tool.py
+│           │   └── rag_retrieve_tool.py
+│           ├── graph/
+│           │   ├── graph_query_tool.py
+│           │   └── graph_upsert_tool.py
+│           └── communication/
+│               ├── mail_send_tool.py
+│               ├── calendar_write_tool.py
+│               └── ui_automation_tool.py
+
+17.2 Capability Registry &amp; Lifecycle Manager
+# octopussy/core/registry.py
+
+from __future__ import annotations
+from collections import defaultdict, deque
+from typing import Any
+
+
+class CircularDependencyError(Exception): ...
+class CapabilityRegistrationError(Exception): ...
+
+
+class OctopussyCapabilityRegistry:
+    """
+    Authoritative catalogue of all Capability Instances.
+    Detects circular dependencies at registration time using Kahn's algorithm.
+    Rejects non-Capability registrations.
+    Is itself a CCA element.
+    """
+
+    def __init__(self) -> None:
+        self._instances:    dict[str, Any]        = {}
+        self._dependencies: dict[str, list[str]]  = {}
+
+    def register(self, name: str, instance: Any, dependencies: list[str]) -> None:
+        """
+        Register a Capability Instance.
+        Raises CapabilityRegistrationError if instance is not a Capability.
+        Raises CircularDependencyError if registration creates a cycle.
+        """
+        if not hasattr(instance, "initialize") or not hasattr(instance, "inject_dependency"):
+            raise CapabilityRegistrationError(
+                f"{name} is not a valid Capability (missing initialize/inject_dependency)"
+            )
+        self._instances[name]    = instance
+        self._dependencies[name] = dependencies
+        # Validate no cycles after each registration
+        self.topological_order()
+
+    def get(self, name: str) -> Any:
+        return self._instances[name]
+
+    def topological_order(self) -> list[str]:
+        """
+        Compute topologically sorted startup order using Kahn's algorithm.
+        Raises CircularDependencyError if a cycle is detected.
+        """
+        in_degree: dict[str, int] = {name: 0 for name in self._instances}
+        for name, deps in self._dependencies.items():
+            for dep in deps:
+                in_degree[name] += 1
+
+        queue: deque[str] = deque(
+            name for name, degree in in_degree.items() if degree == 0
+        )
+        order: list[str] = []
+
+        # Build reverse adjacency: dep → [names that depend on dep]
+        dependents: dict[str, list[str]] = defaultdict(list)
+        for name, deps in self._dependencies.items():
+            for dep in deps:
+                dependents[dep].append(name)
+
+        while queue:
+            name = queue.popleft()
+            order.append(name)
+            for dependent in dependents[name]:
+                in_degree[dependent] -= 1
+                if in_degree[dependent] == 0:
+                    queue.append(dependent)
+
+        if len(order) != len(self._instances):
+            raise CircularDependencyError(
+                "Circular dependency detected among Capabilities: "
+                f"{set(self._instances) - set(order)}"
+            )
+        return order
+
+# octopussy/core/lifecycle_manager.py
+
+from __future__ import annotations
+import asyncio
+import logging
+from typing import Any
+
+from octopussy.core.registry import OctopussyCapabilityRegistry
+
+logger = logging.getLogger(__name__)
+
+
+class CapabilityLifecycleError(Exception): ...
+
+
+class OctopussyCapabilityLifecycleManager:
+    """
+    Orchestrates all Capability Instances through the mandatory six-phase CCA lifecycle:
+    instantiate → initialize() → inject_dependency() → start()
+    → [runtime] →
+    stop() → cleanup()
+
+    CCA 0.2 Role: Capability Lifecycle Manager
+    - Computes topologically sorted startup order using Kahn's algorithm.
+    - Enforces the six-phase lifecycle on every Capability Instance.
+    - inject_dependency(): resolves all Requirement interfaces and injects them
+      into each Capability. This is the exclusive DI mechanism.
+    - Shuts down in strict reverse topological order.
+    - Is itself a CCA element.
+    """
+
+    def __init__(self, registry: OctopussyCapabilityRegistry) -> None:
+        self._registry = registry
+        self._order:   list[str] = []
+
+    async def start_all(self) -> None:
+        """
+        Start all Capability Instances in topological order.
+        Each Capability goes through: initialize() → inject_dependency() → start()
+        inject_dependency() resolves all interfaces declared as Requirements
+        in the Capability's Contract and injects the concrete references
+        into the Capability instance. This is the exclusive DI mechanism.
+        Raises CapabilityLifecycleError if any phase fails.
+        """
+        self._order = self._registry.topological_order()
+        logger.info(
+            "Starting %d Capabilities in order: %s", len(self._order), self._order
+        )
+
+        for name in self._order:
+            cap = self._registry.get(name)
+            try:
+                logger.info("Initializing Capability: %s", name)
+                await cap.initialize()
+                logger.info("Injecting dependencies for Capability: %s", name)
+                await cap.inject_dependency()   # CCA Phase 3: inject all Requirements
+                logger.info("Starting Capability: %s", name)
+                await cap.start()
+                logger.info("Capability started: %s", name)
+            except Exception as exc:
+                raise CapabilityLifecycleError(
+                    f"Capability {name} failed during startup: {exc}"
+                ) from exc
+
+        logger.info("All %d Capabilities started successfully.", len(self._order))
+
+    async def stop_all(self) -> None:
+        """
+        Stop all Capability Instances in strict reverse topological order.
+        Each Capability goes through: stop() → cleanup()
+        """
+        for name in reversed(self._order):
+            cap = self._registry.get(name)
+            try:
+                logger.info("Stopping Capability: %s", name)
+                await cap.stop()
+                logger.info("Cleaning up Capability: %s", name)
+                await cap.cleanup()
+                logger.info("Capability stopped: %s", name)
+            except Exception as exc:
+                logger.error("Capability %s failed during shutdown: %s", name, exc)
+
+17.3 Capability Registration
+# octopussy/capabilities/registration.py
+
+from __future__ import annotations
+from octopussy.core.registry import OctopussyCapabilityRegistry
+
+
+def register_all_capabilities(registry: OctopussyCapabilityRegistry) -> None:
+    """
+    Register all 27 Capability Instances in the OctopussyCapabilityRegistry.
+    Dependencies declared here are used by OCLM to:
+    1. Compute topological startup order (Kahn's algorithm).
+    2. Inject required interface references via inject_dependency() (CCA Phase 3).
+
+    Dependency rule: a Capability's dependencies list contains the names of the
+    Capabilities whose interfaces it CONSUMES (its Requirements).
+    """
+
+    registry.register(
+        name         = "SecretsCapability",
+        instance     = ...,   # CapabilityFactory.create(...)
+        dependencies = [],    # No Requirements; starts first
+    )
+    registry.register(
+        name         = "ConfigurationCapability",
+        instance     = ...,
+        dependencies = ["SecretsCapability"],
+        # Consumes: SecretsPort from SecretsCapability
+    )
+    registry.register(
+        name         = "ObservabilityCapability",
+        instance     = ...,
+        dependencies = ["SecretsCapability", "ConfigurationCapability"],
+        # Consumes: SecretsPort, ConfigurationPort
+    )
+    registry.register(
+        name         = "SecurityCapability",
+        instance     = ...,
+        dependencies = ["SecretsCapability", "ConfigurationCapability",
+                        "ObservabilityCapability"],
+        # Consumes: SecretsPort, ConfigurationPort, ObservabilityPort
+    )
+    registry.register(
+        name         = "MessagingCapability",
+        instance     = ...,
+        dependencies = ["ConfigurationCapability", "SecurityCapability",
+                        "ObservabilityCapability"],
+        # Consumes: ConfigurationPort, SecurityPort, ObservabilityPort
+    )
+    registry.register(
+        name         = "PluginCapability",
+        instance     = ...,
+        dependencies = ["ConfigurationCapability", "ObservabilityCapability"],
+        # Consumes: ConfigurationPort, ObservabilityPort
+    )
+    registry.register(
+        name         = "SandboxCapability",
+        instance     = ...,
+        dependencies = ["ConfigurationCapability", "ObservabilityCapability"],
+        # Consumes: ConfigurationPort, ObservabilityPort
+    )
+    registry.register(
+        name         = "ToolRegistryCapability",
+        instance     = ...,
+        dependencies = ["PluginCapability", "SandboxCapability",
+                        "SecurityCapability", "ObservabilityCapability"],
+        # Consumes: PluginContract, SandboxPort, SecurityPort, ObservabilityPort
+    )
+    registry.register(
+        name         = "LLMRouterCapability",
+        instance     = ...,
+        dependencies = ["ConfigurationCapability", "SecretsCapability",
+                        "PluginCapability", "ObservabilityCapability"],
+        # Consumes: ConfigurationPort, SecretsPort, PluginContract, ObservabilityPort
+    )
+    registry.register(
+        name         = "MemoryCapability",
+        instance     = ...,
+        dependencies = ["ConfigurationCapability", "ObservabilityCapability"],
+        # Consumes: ConfigurationPort, ObservabilityPort
+    )
+    registry.register(
+        name         = "RAGCapability",
+        instance     = ...,
+        dependencies = ["ConfigurationCapability", "MemoryCapability",
+                        "PluginCapability", "ObservabilityCapability"],
+        # Consumes: ConfigurationPort, MemoryPort, PluginContract, ObservabilityPort
+    )
+    registry.register(
+        name         = "GraphRAGCapability",
+        instance     = ...,
+        dependencies = ["ConfigurationCapability", "SecretsCapability",
+                        "ObservabilityCapability"],
+        # Consumes: ConfigurationPort, SecretsPort, ObservabilityPort
+    )
+    registry.register(
+        name         = "TokenBudgetCapability",
+        instance     = ...,
+        dependencies = ["ConfigurationCapability", "ObservabilityCapability"],
+        # Consumes: ConfigurationPort, ObservabilityPort
+    )
+    registry.register(
+        name         = "PromptEngineCapability",
+        instance     = ...,
+        dependencies = ["ConfigurationCapability", "PluginCapability",
+                        "ObservabilityCapability"],
+        # Consumes: ConfigurationPort, PluginContract, ObservabilityPort
+    )
+    registry.register(
+        name         = "UserAgentExtensionCapability",
+        instance     = ...,
+        dependencies = ["PluginCapability", "ObservabilityCapability"],
+        # Consumes: PluginContract, ObservabilityPort
+        # Must start before ActorCapability and AgentFactoryCapability
+    )
+    registry.register(
+        name         = "ActorCapability",
+        instance     = ...,
+        dependencies = ["LLMRouterCapability", "MemoryCapability",
+                        "RAGCapability", "GraphRAGCapability",
+                        "ToolRegistryCapability", "SandboxCapability",
+                        "TokenBudgetCapability", "SecurityCapability",
+                        "MessagingCapability", "ObservabilityCapability"],
+        # Consumes: LLMPort, VLMPort, MemoryPort, RAGPort, GraphPort,
+        #           ToolExecutorPort, SandboxPort, TokenBudgetPort,
+        #           SecurityPort, MessagingContract, ObservabilityPort
+        # Note: AgentLifecyclePort injected at agent creation time by AgentFactoryCapability
+    )
+    registry.register(
+        name         = "AgentLifecycleManagerCapability",
+        instance     = ...,
+        dependencies = ["ConfigurationCapability", "ObservabilityCapability"],
+        # Consumes: ConfigurationPort, ObservabilityPort
+    )
+    registry.register(
+        name         = "AgentFactoryCapability",
+        instance     = ...,
+        dependencies = ["ConfigurationCapability", "LLMRouterCapability",
+                        "MemoryCapability", "RAGCapability", "GraphRAGCapability",
+                        "ToolRegistryCapability", "SandboxCapability",
+                        "TokenBudgetCapability", "AgentLifecycleManagerCapability",
+                        "SecurityCapability", "UserAgentExtensionCapability",
+                        "ObservabilityCapability"],
+        # Consumes: ConfigurationPort, LLMRouterContract, MemoryPort, RAGPort,
+        #           GraphPort, ToolExecutorPort, SandboxPort, TokenBudgetPort,
+        #           AgentLifecyclePort, SecurityPort, UserAgentRegistryPort,
+        #           ObservabilityPort
+    )
+    registry.register(
+        name         = "CritiqueCapability",
+        instance     = ...,
+        dependencies = ["LLMRouterCapability", "ObservabilityCapability"],
+        # Consumes: LLMRouterContract, ObservabilityPort
+    )
+    registry.register(
+        name         = "SchedulerCapability",
+        instance     = ...,
+        dependencies = ["ConfigurationCapability", "MessagingCapability",
+                        "ObservabilityCapability"],
+        # Consumes: ConfigurationPort, MessagingContract, ObservabilityPort
+    )
+    registry.register(
+        name         = "TeamCapability",
+        instance     = ...,
+        dependencies = ["AgentFactoryCapability", "AgentLifecycleManagerCapability",
+                        "MessagingCapability", "MemoryCapability",
+                        "ObservabilityCapability"],
+        # Consumes: AgentFactoryContract, AgentLifecyclePort,
+        #           MessagingContract, MemoryPort, ObservabilityPort
+    )
+    registry.register(
+        name         = "CommunicationAdapterCapability",
+        instance     = ...,
+        dependencies = ["PluginCapability", "MessagingCapability",
+                        "SecurityCapability", "ObservabilityCapability"],
+        # Consumes: PluginContract, MessagingContract, SecurityPort, ObservabilityPort
+    )
+    registry.register(
+        name         = "UserSessionCapability",
+        instance     = ...,
+        dependencies = ["ConfigurationCapability", "SecurityCapability",
+                        "ObservabilityCapability"],
+        # Consumes: ConfigurationPort, SecurityPort, ObservabilityPort
+    )
+    registry.register(
+        name         = "SpeechCapability",
+        instance     = ...,
+        dependencies = ["ConfigurationCapability", "ObservabilityCapability"],
+        # Consumes: ConfigurationPort, ObservabilityPort
+    )
+    registry.register(
+        name         = "OrchestratorCapability",
+        instance     = ...,
+        dependencies = ["AgentFactoryCapability", "AgentLifecycleManagerCapability",
+                        "TeamCapability", "MessagingCapability",
+                        "SecurityCapability", "ObservabilityCapability"],
+        # Consumes: AgentFactoryContract, AgentLifecyclePort, TeamContract,
+        #           MessagingContract, SecurityPort, ObservabilityPort
+    )
+    registry.register(
+        name         = "CLICapability",
+        instance     = ...,
+        dependencies = ["OrchestratorCapability", "ObservabilityCapability"],
+        # Consumes: OrchestratorContract, ObservabilityPort
+    )
+    registry.register(
+        name         = "WebUICapability",
+        instance     = ...,
+        dependencies = ["OrchestratorCapability", "UserSessionCapability",
+                        "ObservabilityCapability"],
+        # Consumes: OrchestratorContract, UserSessionContract, ObservabilityPort
+    )
+
+
+18. EVOLUTION &amp; VERSIONING POLICY
+
+Semantic versioning: Every Capability carries CAPABILITY_VERSION and MINIMUM_CLIENT_VERSION.
+Deprecation policy: 12 months notice before removal of any Contract method.
+Migration path: Published before old version is removed; migration guide linked in Evolution Envelope.
+Breaking changes: Increment MAJOR version. All breaking changes are announced in the changelog.
+Backward compatibility: MINOR and PATCH changes are backward-compatible.
+User agent plugins: Must declare min_octopussy_version in plugin.json. Incompatible plugins are rejected at load time with a clear error.
+
+
+19. APPENDIX A: OPEN SOURCE STACK
+
+
+
+Component
+Library
+Version
+
+
+
+Async runtime
+asyncio
+Python 3.11+ stdlib
+
+
+Web framework
+fastapi
+≥0.110
+
+
+ASGI server
+uvicorn
+≥0.29
+
+
+NATS client
+nats-py
+≥2.6
+
+
+RabbitMQ client
+aio-pika
+≥9.4
+
+
+gRPC
+grpcio
+≥1.62
+
+
+CLI
+click
+≥8.1
+
+
+CLI formatting
+rich
+≥13.7
+
+
+Config parsing
+pyyaml
+≥6.0
+
+
+Config watching
+watchfiles
+≥0.21
+
+
+Scheduling
+apscheduler
+≥3.10
+
+
+JWT
+python-jose
+≥3.3
+
+
+TOTP
+pyotp
+≥2.9
+
+
+Encryption
+cryptography
+≥42.0
+
+
+HashiCorp Vault
+hvac
+≥2.1
+
+
+OpenTelemetry
+opentelemetry-sdk
+≥1.23
+
+
+Prometheus
+prometheus-client
+≥0.20
+
+
+Vector DB (default)
+chromadb
+≥0.4
+
+
+Graph DB (default)
+neo4j
+≥5.18
+
+
+Embeddings
+sentence-transformers
+≥2.7
+
+
+STT
+openai-whisper
+≥20231117
+
+
+TTS
+piper-tts
+≥1.2
+
+
+Sandbox
+docker
+≥7.0
+
+
+MCP
+mcp
+≥1.6 (2025-11-25 protocol)
+
+
+Dataclasses
+dataclasses
+Python 3.11+ stdlib
+
+
+UUID
+uuid
+Python 3.11+ stdlib
+
+
+
+End of Octopussy Architecture Specification &amp; Implementation Skeleton v5.0 🐙
+
+
+v5.0 Summary of Changes from v4.0.1:
+All CCA Provisions/Requirements terminology corrected throughout (Provisions = interfaces a Capability provides; Requirements = interfaces a Capability consumes, injected by OCLM). UserAgentExtensionCapability (4.26) added with full Nucleus/Contract/Envelope. UserAgentRegistryPort defined and injected into AgentFactoryCapability. AgentType.USER_DEFINED and PluginType.USER_AGENT_PLUGIN added. WebUICapability Requirements corrected to include UserSessionCapability. UserSessionCapability Requirements corrected to include SecurityCapability. hmac.new() corrected to hmac.new() with bytes enforcement. OctopussyMessage.verify_signature() made safe (returns bool, never raises). AgentLifecyclePort promoted to a full port in ports.py with register_agent and deregister_agent. Startup order updated to include UserAgentExtensionCapability before ActorCapability. All 27 Capabilities registered with correct dependency annotations. Duplicate content removed. Markdig rendering artifacts removed throughout.

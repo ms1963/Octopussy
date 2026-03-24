@@ -6388,3 +6388,2317 @@ These addendums are normative supplements to Octopussy Architecture Specificatio
 
 End of Octopussy Architecture Specification & Implementation Skeleton v4.0.1
 This document is the single, authoritative, production-ready specification for Octopussy v4.0.1. It is sufficient for developers or an LLM to implement the complete platform. All 26 Capabilities are fully specified with CCA 0.2 Nucleus (Essence/Realization/Adaptation), Contract (Provisions/Requirements/Protocols), Capability Instance definition, Capability Lifecycle Manager, Capability Registry, and Evolution Envelope. All design patterns are applied. MCP 2025-11-25 Streamable HTTP transport is the exclusive mechanism for all tool calls. The architecture strictly conforms to CCA 0.2 by Michael Stal. Both inQ and outQ are asyncio.PriorityQueue instances keyed by MessagePriority. All built-in tools are fully catalogued in Chapter 5. The Dead Letter Queue is fully specified in MessagingCapability with its own DLQPort, DLQStore, and persistence guarantee. All LLMPorts and VLMPorts delivered by default are fully enumerated. All RAGPorts and GraphPorts for all supported databases are fully specified. LLMPort and VLMPort define both cloud-provided and local inference engine providers; Octopussy calls their REST APIs via httpx and does not manage GPU hardware directly. API tokens and credentials for all LLM providers are managed by users via SecretsCapability (CLI or WebUI Credentials Manager) and retrieved by LLMRouterCapability at call time. Users are registered, validated, authenticated, and authorized by SecurityCapability and UserSessionCapability. All CommunicationPorts for all supported protocols (NATS, RabbitMQ, REST, gRPC, MCP, WebSocket, InMemoryBus) are fully specified. 🐙
+
+
+
+OCTOPUSSY v5.0 — ARCHITECTURE ADDENDUM
+Comprehensive Workflow &amp; Architecture Diagrams
+Addendum Version: 1.0 | Spec Version: 5.0.0 | Date: 2026-03-24
+Purpose: Companion to the Octopussy Architecture Specification v5.0. Provides all workflow and architecture diagrams required for complete implementation by an LLM. All diagrams are derived exclusively from the normative specification and are implementation-authoritative.
+
+
+HOW TO USE THIS ADDENDUM
+Feed this document together with the main specification to an LLM. Each diagram section references the spec section it elaborates. The diagrams make implicit structural and behavioral relationships explicit and visual, enabling an LLM to implement each module with full context of how it fits into the whole system.
+
+
+TABLE OF CONTENTS
+
+
+
+ID
+Diagram
+Spec Section
+
+
+
+D-01
+System-Level CCA Capability Map
+§3
+
+
+D-02
+CCA Capability Nucleus Internal Structure
+§2.1, §4.x
+
+
+D-03
+Capability Lifecycle — Six Phases (OCLM)
+§2.1
+
+
+D-04
+Capability Startup &amp; Shutdown Order
+§3
+
+
+D-05
+Full Capability Dependency Graph
+§17 (registration)
+
+
+D-06
+OctopussyMessage — Structure &amp; Processing Chain
+§4.0.2, §8
+
+
+D-07
+Agent State Machine
+§6
+
+
+D-08
+Actor Model &amp; Agent Internal Architecture
+§6
+
+
+D-09
+Messaging Architecture — Full Message Flow
+§8
+
+
+D-10
+Security Zero-Trust Enforcement Chain
+§10
+
+
+D-11
+LLM/VLM Router Architecture
+§9
+
+
+D-12
+Team Patterns — All Four Multi-Agent Patterns
+§7
+
+
+D-13
+MCP Integration Architecture (2025-11-25)
+§11
+
+
+D-14
+Plugin Architecture &amp; Plugin Lifecycle
+§15
+
+
+D-15
+Deployment Architecture — Four Profiles
+§12
+
+
+D-16
+Port Interface Taxonomy
+§4.0.3
+
+
+D-17
+Agent Creation Workflow (AgentFactory)
+§4.2
+
+
+D-18
+Tool Execution Workflow
+§5
+
+
+D-19
+User Agent Extension Flow (v5.0)
+§4.26
+
+
+D-20
+Project Directory Structure (Annotated)
+§17.1
+
+
+
+D-01 — SYSTEM-LEVEL CCA CAPABILITY MAP
+
+Spec ref: §3 — System-Level CCA Capability Map
+Purpose: Shows all 27 Capabilities that constitute the Octopussy system and their CCA structural classification. Every node is a full Nucleus+Contract+Envelope unit. This is the master inventory for implementation.
+
+OctopussySystem (v5.0.0)
+│
+│  ┌─────────────────────────────────────────────────────────────────────┐
+│  │  INFRASTRUCTURE LAYER  (must start first; no agent dependencies)    │
+│  ├─────────────────────────────────────────────────────────────────────┤
+│  ├── [1]  SecretsCapability              (Nucleus + Contract + Envelope)
+│  ├── [2]  ConfigurationCapability        (Nucleus + Contract + Envelope)
+│  ├── [3]  ObservabilityCapability        (Nucleus + Contract + Envelope) ◄─ [SIDECAR]
+│  ├── [4]  SecurityCapability             (Nucleus + Contract + Envelope)
+│  └── [5]  MessagingCapability            (Nucleus + Contract + Envelope)
+│
+│  ┌─────────────────────────────────────────────────────────────────────┐
+│  │  EXTENSIBILITY LAYER                                                │
+│  ├─────────────────────────────────────────────────────────────────────┤
+│  ├── [6]  PluginCapability               (Nucleus + Contract + Envelope)
+│  └── [26] UserAgentExtensionCapability   (Nucleus + Contract + Envelope) ◄─ [NEW v5.0]
+│
+│  ┌─────────────────────────────────────────────────────────────────────┐
+│  │  EXECUTION LAYER  (sandboxing, tools, LLM)                         │
+│  ├─────────────────────────────────────────────────────────────────────┤
+│  ├── [7]  SandboxCapability              (Nucleus + Contract + Envelope)
+│  ├── [8]  ToolRegistryCapability         (Nucleus + Contract + Envelope)
+│  └── [9]  LLMRouterCapability            (Nucleus + Contract + Envelope)
+│
+│  ┌─────────────────────────────────────────────────────────────────────┐
+│  │  KNOWLEDGE LAYER  (memory, RAG, graph, tokens, prompts)            │
+│  ├─────────────────────────────────────────────────────────────────────┤
+│  ├── [10] MemoryCapability               (Nucleus + Contract + Envelope)
+│  ├── [11] RAGCapability                  (Nucleus + Contract + Envelope)
+│  ├── [12] GraphRAGCapability             (Nucleus + Contract + Envelope)
+│  ├── [13] TokenBudgetCapability          (Nucleus + Contract + Envelope)
+│  └── [14] PromptEngineCapability         (Nucleus + Contract + Envelope)
+│
+│  ┌─────────────────────────────────────────────────────────────────────┐
+│  │  AGENT LAYER  (actor model, lifecycle, factory, critique, schedule) │
+│  ├─────────────────────────────────────────────────────────────────────┤
+│  ├── [15] ActorCapability                (Nucleus + Contract + Envelope)
+│  ├── [16] AgentLifecycleManagerCapability(Nucleus + Contract + Envelope)
+│  ├── [17] AgentFactoryCapability         (Nucleus + Contract + Envelope)
+│  ├── [18] CritiqueCapability             (Nucleus + Contract + Envelope)
+│  └── [19] SchedulerCapability            (Nucleus + Contract + Envelope)
+│
+│  ┌─────────────────────────────────────────────────────────────────────┐
+│  │  COORDINATION LAYER  (teams, comms, sessions, speech)              │
+│  ├─────────────────────────────────────────────────────────────────────┤
+│  ├── [20] TeamCapability                 (Nucleus + Contract + Envelope)
+│  ├── [21] CommunicationAdapterCapability (Nucleus + Contract + Envelope)
+│  ├── [22] UserSessionCapability          (Nucleus + Contract + Envelope)
+│  └── [23] SpeechCapability              (Nucleus + Contract + Envelope)
+│
+│  ┌─────────────────────────────────────────────────────────────────────┐
+│  │  INTERFACE LAYER  (orchestrator, CLI, WebUI)                       │
+│  ├─────────────────────────────────────────────────────────────────────┤
+│  ├── [24] OrchestratorCapability         (Nucleus + Contract + Envelope)
+│  ├── [25] CLICapability                  (Nucleus + Contract + Envelope)
+│  └── [27] WebUICapability               (Nucleus + Contract + Envelope)
+│
+└─ Total: 27 Capabilities — all CCA 0.2 compliant
+
+
+D-02 — CCA CAPABILITY NUCLEUS INTERNAL STRUCTURE
+
+Spec ref: §2.1 — CCA 0.2 Application
+Purpose: Every single one of the 27 Capabilities MUST follow this exact three-layer Nucleus structure. This diagram is the template for implementing any Capability.
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     CAPABILITY: <CapabilityName>                            │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  EVOLUTION ENVELOPE                                                  │   │
+│  │  CAPABILITY_VERSION     = "5.0"                                      │   │
+│  │  MINIMUM_CLIENT_VERSION = "4.0"                                      │   │
+│  │  DEPRECATION_POLICY     = "12 months notice before removal"          │   │
+│  │  MIGRATION_GUIDE        = "docs/migration/<name>_5_0.md"             │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  CONTRACT  (abstract interface — what this Capability provides)      │   │
+│  │                                                                      │   │
+│  │  Provisions  ──► Public methods this Capability exposes to others    │   │
+│  │  Requirements ──► Ports injected by OCLM via inject_dependency()     │   │
+│  │  Protocols   ──► Interaction rules, ordering, transport standards    │   │
+│  │                                                                      │   │
+│  │  Mandatory method: async def inject_dependency(self) -> None         │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  NUCLEUS                                                             │   │
+│  │                                                                      │   │
+│  │  ┌──────────────────────────────────────────────────────────────┐   │   │
+│  │  │  ESSENCE  (pure domain logic — NO I/O, NO infrastructure)    │   │   │
+│  │  │  • Domain algorithms and business rules                      │   │   │
+│  │  │  • State machines, engines, validators                       │   │   │
+│  │  │  • No external dependencies; fully unit-testable in isolation │   │   │
+│  │  └──────────────────────────────────────────────────────────────┘   │   │
+│  │                          ▲ uses                                      │   │
+│  │  ┌──────────────────────────────────────────────────────────────┐   │   │
+│  │  │  REALIZATION  (technical mechanisms — DB, queues, HTTP)      │   │   │
+│  │  │  • Database adapters (SQLite, Redis, PostgreSQL)             │   │   │
+│  │  │  • Queue implementations (NATS, RabbitMQ, in-memory)        │   │   │
+│  │  │  • HTTP clients, gRPC stubs, file I/O                       │   │   │
+│  │  └──────────────────────────────────────────────────────────────┘   │   │
+│  │                          ▲ uses                                      │   │
+│  │  ┌──────────────────────────────────────────────────────────────┐   │   │
+│  │  │  ADAPTATION  (external interfaces — REST, gRPC, CLI, MCP)   │   │   │
+│  │  │  • REST adapters (FastAPI routes)                            │   │   │
+│  │  │  • gRPC adapters                                             │   │   │
+│  │  │  • CLI adapters                                              │   │   │
+│  │  │  • MCP adapters (MCP 2025-11-25 Streamable HTTP)            │   │   │
+│  │  │  • Exposes Port interfaces to other Capabilities via DI      │   │   │
+│  │  └──────────────────────────────────────────────────────────────┘   │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+  CREATION RULE: All Capabilities created ONLY via CapabilityFactory.
+  REGISTRATION:  Registered ONLY in OctopussyCapabilityRegistry.
+  LIFECYCLE:     Managed ONLY by OctopussyCapabilityLifecycleManager (OCLM).
+
+
+D-03 — CAPABILITY LIFECYCLE — SIX PHASES (OCLM)
+
+Spec ref: §2.1 — Capability Instance, inject_dependency()
+Purpose: Every Capability passes through exactly these six phases in order. The OCLM enforces this without exception. Critical for implementing lifecycle_manager.py.
+
+                    OctopussyCapabilityLifecycleManager (OCLM)
+                    ┌─────────────────────────────────────────┐
+                    │  1. Compute topological order            │
+                    │     (Kahn's algorithm on dependency DAG) │
+                    │  2. Validate: no circular dependencies   │
+                    │  3. Execute phases in topological order  │
+                    └─────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│                    SIX-PHASE CCA CAPABILITY LIFECYCLE                    │
+│                                                                          │
+│  PHASE 1: INSTANTIATE                                                    │
+│  ┌────────────────────────────────────────────────────────────────────┐  │
+│  │  CapabilityFactory.create(<CapabilityClass>, config)               │  │
+│  │  • Allocates the Capability instance                               │  │
+│  │  • Sets internal fields to None / defaults                         │  │
+│  │  • Does NOT connect to any external resource yet                   │  │
+│  └────────────────────────────────────────────────────────────────────┘  │
+│                                  │                                       │
+│                                  ▼                                       │
+│  PHASE 2: INITIALIZE                                                     │
+│  ┌────────────────────────────────────────────────────────────────────┐  │
+│  │  capability.initialize()                                           │  │
+│  │  • Loads local configuration (from ConfigurationPort if available) │  │
+│  │  • Validates configuration schema                                  │  │
+│  │  • Prepares internal data structures                               │  │
+│  │  • Does NOT yet connect to other Capabilities                      │  │
+│  └────────────────────────────────────────────────────────────────────┘  │
+│                                  │                                       │
+│                                  ▼                                       │
+│  PHASE 3: INJECT_DEPENDENCY  ◄── KEY PHASE                              │
+│  ┌────────────────────────────────────────────────────────────────────┐  │
+│  │  capability.inject_dependency()  [called by OCLM]                  │  │
+│  │                                                                    │  │
+│  │  OCLM resolves all Requirements declared in the Contract:          │  │
+│  │    self._secrets_port    = registry.get("SecretsCapability")       │  │
+│  │    self._config_port     = registry.get("ConfigurationCapability") │  │
+│  │    self._obs_port        = registry.get("ObservabilityCapability") │  │
+│  │    ... (all declared Requirements)                                 │  │
+│  │                                                                    │  │
+│  │  RULE: This is the ONLY way a Capability may obtain references     │  │
+│  │        to other Capabilities' ports. No service locator.           │  │
+│  │        No global registry lookup at runtime.                       │  │
+│  └────────────────────────────────────────────────────────────────────┘  │
+│                                  │                                       │
+│                                  ▼                                       │
+│  PHASE 4: START                                                          │
+│  ┌────────────────────────────────────────────────────────────────────┐  │
+│  │  capability.start()                                                │  │
+│  │  • Opens connections to external resources (DB, NATS, etc.)        │  │
+│  │  • Starts background asyncio tasks (_message_loop, _heartbeat)     │  │
+│  │  • Registers tools (ToolRegistryCapability)                        │  │
+│  │  • Begins serving requests                                         │  │
+│  └────────────────────────────────────────────────────────────────────┘  │
+│                                  │                                       │
+│                                  ▼                                       │
+│  PHASE 5: RUNTIME  [steady state — indefinite duration]                  │
+│  ┌────────────────────────────────────────────────────────────────────┐  │
+│  │  • Processes requests via Provisions (public Contract methods)     │  │
+│  │  • Emits metrics, traces, logs via ObservabilityPort               │  │
+│  │  • Handles hot-reload (PluginCapability, ConfigurationCapability)  │  │
+│  │  • Responds to health checks                                       │  │
+│  └────────────────────────────────────────────────────────────────────┘  │
+│                                  │                                       │
+│                                  ▼                                       │
+│  PHASE 6a: STOP                                                          │
+│  ┌────────────────────────────────────────────────────────────────────┐  │
+│  │  capability.stop()   [REVERSE topological order]                   │  │
+│  │  • Stops accepting new requests                                    │  │
+│  │  • Drains in-flight operations (graceful shutdown)                 │  │
+│  │  • Cancels background asyncio tasks                                │  │
+│  └────────────────────────────────────────────────────────────────────┘  │
+│                                  │                                       │
+│                                  ▼                                       │
+│  PHASE 6b: CLEANUP                                                       │
+│  ┌────────────────────────────────────────────────────────────────────┐  │
+│  │  capability.cleanup()                                              │  │
+│  │  • Closes DB connections, HTTP sessions, NATS connections          │  │
+│  │  • Releases all resources                                          │  │
+│  │  • Nullifies injected port references                              │  │
+│  └────────────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────────────┘
+
+  SHUTDOWN ORDER: Strict reverse of startup topological order.
+  WebUICapability → CLICapability → OrchestratorCapability → ... → SecretsCapability
+
+
+D-04 — CAPABILITY STARTUP &amp; SHUTDOWN ORDER
+
+Spec ref: §3 — Startup order (topological, computed by Kahn's algorithm)
+Purpose: The exact, normative startup sequence. Shutdown is the strict reverse. Critical for implementing registry.py and lifecycle_manager.py.
+
+STARTUP ORDER (topological — Kahn's algorithm on dependency DAG)
+════════════════════════════════════════════════════════════════
+
+  Step  Capability                        Layer
+  ────  ─────────────────────────────     ─────────────────────
+   1    SecretsCapability                 Infrastructure
+   2    ConfigurationCapability           Infrastructure
+   3    ObservabilityCapability  [SIDECAR] Infrastructure  ◄── starts independently, never blocks
+   4    SecurityCapability                Infrastructure
+   5    MessagingCapability               Infrastructure
+   6    PluginCapability                  Extensibility
+   7    SandboxCapability                 Execution
+   8    ToolRegistryCapability            Execution
+   9    LLMRouterCapability               Execution
+  10    MemoryCapability                  Knowledge
+  11    RAGCapability                     Knowledge
+  12    GraphRAGCapability                Knowledge
+  13    TokenBudgetCapability             Knowledge
+  14    PromptEngineCapability            Knowledge
+  15    UserAgentExtensionCapability      Extensibility  ◄── NEW v5.0; must precede 16 &amp; 17
+  16    ActorCapability                   Agent
+  17    AgentLifecycleManagerCapability   Agent
+  18    AgentFactoryCapability            Agent
+  19    CritiqueCapability                Agent
+  20    SchedulerCapability               Agent
+  21    TeamCapability                    Coordination
+  22    CommunicationAdapterCapability    Coordination
+  23    UserSessionCapability             Coordination
+  24    SpeechCapability                  Coordination
+  25    OrchestratorCapability            Interface
+  26    CLICapability                     Interface
+  27    WebUICapability                   Interface
+
+SHUTDOWN ORDER (strict reverse of above)
+════════════════════════════════════════
+  27 → 26 → 25 → 24 → 23 → 22 → 21 → 20 → 19 → 18 → 17 → 16 → 15
+  → 14 → 13 → 12 → 11 → 10 → 9 → 8 → 7 → 6 → 5 → 4 → 3 → 2 → 1
+
+
+D-05 — FULL CAPABILITY DEPENDENCY GRAPH
+
+Spec ref: §17 — registration.py (register_all_capabilities)
+Purpose: Shows every injected dependency (port/contract) between all 27 Capabilities. This is the authoritative wiring diagram for inject_dependency() implementations. An arrow A ──► B means "A consumes a port provided by B".
+
+LEGEND:  A ──► B  means  A's inject_dependency() receives a port from B
+         [Port/Contract name shown on arrow where space permits]
+
+SecretsCapability ◄──────────────────────────────────────────────────────────
+  │ SecretsPort ──────────────────────────────────────────────────────────────►  LLMRouterCapability
+  │ SecretsPort ──────────────────────────────────────────────────────────────►  SecurityCapability
+  │ SecretsPort ──────────────────────────────────────────────────────────────►  ObservabilityCapability
+
+ConfigurationCapability ◄────────────────────────────────────────────────────
+  │ ConfigurationPort ────────────────────────────────────────────────────────►  ObservabilityCapability
+  │ ConfigurationPort ────────────────────────────────────────────────────────►  SecurityCapability
+  │ ConfigurationPort ────────────────────────────────────────────────────────►  MessagingCapability
+  │ ConfigurationPort ────────────────────────────────────────────────────────►  PluginCapability
+  │ ConfigurationPort ────────────────────────────────────────────────────────►  SandboxCapability
+  │ ConfigurationPort ────────────────────────────────────────────────────────►  LLMRouterCapability
+  │ ConfigurationPort ────────────────────────────────────────────────────────►  MemoryCapability
+  │ ConfigurationPort ────────────────────────────────────────────────────────►  TokenBudgetCapability
+  │ ConfigurationPort ────────────────────────────────────────────────────────►  PromptEngineCapability
+  │ ConfigurationPort ────────────────────────────────────────────────────────►  AgentLifecycleManagerCapability
+  │ ConfigurationPort ────────────────────────────────────────────────────────►  AgentFactoryCapability
+  │ ConfigurationPort ────────────────────────────────────────────────────────►  SchedulerCapability
+  │ ConfigurationPort ────────────────────────────────────────────────────────►  UserSessionCapability
+  │ ConfigurationPort ────────────────────────────────────────────────────────►  SpeechCapability
+
+ObservabilityCapability [SIDECAR] ◄──────────────────────────────────────────
+  │ ObservabilityPort ────────────────────────────────────────────────────────►  ALL 26 other Capabilities
+  │                                                                             (injected into every Capability
+  │                                                                              via inject_dependency())
+
+SecurityCapability ◄─────────────────────────────────────────────────────────
+  │ SecurityPort ─────────────────────────────────────────────────────────────►  MessagingCapability
+  │ SecurityPort ─────────────────────────────────────────────────────────────►  ToolRegistryCapability
+  │ SecurityPort ─────────────────────────────────────────────────────────────►  ActorCapability
+  │ SecurityPort ─────────────────────────────────────────────────────────────►  AgentFactoryCapability
+  │ SecurityPort ─────────────────────────────────────────────────────────────►  CommunicationAdapterCapability
+  │ SecurityPort ─────────────────────────────────────────────────────────────►  OrchestratorCapability
+  │ SecurityPort ─────────────────────────────────────────────────────────────►  UserSessionCapability
+
+MessagingCapability ◄────────────────────────────────────────────────────────
+  │ MessagingContract ────────────────────────────────────────────────────────►  ActorCapability
+  │ MessagingContract ────────────────────────────────────────────────────────►  AgentFactoryCapability (indirect)
+  │ MessagingContract ────────────────────────────────────────────────────────►  TeamCapability
+  │ MessagingContract ────────────────────────────────────────────────────────►  CommunicationAdapterCapability
+  │ MessagingContract ────────────────────────────────────────────────────────►  SchedulerCapability
+  │ MessagingContract ────────────────────────────────────────────────────────►  OrchestratorCapability
+
+PluginCapability ◄───────────────────────────────────────────────────────────
+  │ PluginContract ───────────────────────────────────────────────────────────►  ToolRegistryCapability
+  │ PluginContract ───────────────────────────────────────────────────────────►  LLMRouterCapability
+  │ PluginContract ───────────────────────────────────────────────────────────►  PromptEngineCapability
+  │ PluginContract ───────────────────────────────────────────────────────────►  UserAgentExtensionCapability
+  │ PluginContract ───────────────────────────────────────────────────────────►  CommunicationAdapterCapability
+
+SandboxCapability ◄──────────────────────────────────────────────────────────
+  │ SandboxPort ──────────────────────────────────────────────────────────────►  ToolRegistryCapability
+  │ SandboxPort ──────────────────────────────────────────────────────────────►  ActorCapability
+  │ SandboxPort ──────────────────────────────────────────────────────────────►  AgentFactoryCapability
+
+ToolRegistryCapability ◄─────────────────────────────────────────────────────
+  │ ToolExecutorPort ─────────────────────────────────────────────────────────►  ActorCapability
+  │ ToolExecutorPort ─────────────────────────────────────────────────────────►  AgentFactoryCapability
+
+LLMRouterCapability ◄────────────────────────────────────────────────────────
+  │ LLMPort / VLMPort ────────────────────────────────────────────────────────►  ActorCapability
+  │ LLMRouterContract ────────────────────────────────────────────────────────►  AgentFactoryCapability
+  │ LLMRouterContract ────────────────────────────────────────────────────────►  CritiqueCapability
+
+MemoryCapability ◄───────────────────────────────────────────────────────────
+  │ MemoryPort ───────────────────────────────────────────────────────────────►  ActorCapability
+  │ MemoryPort ───────────────────────────────────────────────────────────────►  AgentFactoryCapability
+  │ MemoryPort ───────────────────────────────────────────────────────────────►  RAGCapability
+  │ MemoryPort ───────────────────────────────────────────────────────────────►  TeamCapability
+
+RAGCapability ◄──────────────────────────────────────────────────────────────
+  │ RAGPort ──────────────────────────────────────────────────────────────────►  ActorCapability
+  │ RAGPort ──────────────────────────────────────────────────────────────────►  AgentFactoryCapability
+
+GraphRAGCapability ◄─────────────────────────────────────────────────────────
+  │ GraphPort ────────────────────────────────────────────────────────────────►  ActorCapability
+  │ GraphPort ────────────────────────────────────────────────────────────────►  AgentFactoryCapability
+
+TokenBudgetCapability ◄──────────────────────────────────────────────────────
+  │ TokenBudgetPort ──────────────────────────────────────────────────────────►  ActorCapability
+  │ TokenBudgetPort ──────────────────────────────────────────────────────────►  AgentFactoryCapability
+
+PromptEngineCapability ◄─────────────────────────────────────────────────────
+  │ PromptEngineContract ─────────────────────────────────────────────────────►  ActorCapability (indirect)
+  │ PromptEngineContract ─────────────────────────────────────────────────────►  AgentFactoryCapability (indirect)
+
+UserAgentExtensionCapability [NEW v5.0] ◄────────────────────────────────────
+  │ UserAgentRegistryPort ────────────────────────────────────────────────────►  AgentFactoryCapability
+
+AgentLifecycleManagerCapability ◄────────────────────────────────────────────
+  │ AgentLifecyclePort ───────────────────────────────────────────────────────►  ActorCapability (at creation time)
+  │ AgentLifecyclePort ───────────────────────────────────────────────────────►  AgentFactoryCapability
+  │ AgentLifecyclePort ───────────────────────────────────────────────────────►  TeamCapability
+  │ AgentLifecyclePort ───────────────────────────────────────────────────────►  OrchestratorCapability
+
+AgentFactoryCapability ◄─────────────────────────────────────────────────────
+  │ AgentFactoryContract ─────────────────────────────────────────────────────►  TeamCapability
+  │ AgentFactoryContract ─────────────────────────────────────────────────────►  OrchestratorCapability
+
+TeamCapability ◄─────────────────────────────────────────────────────────────
+  │ TeamContract ─────────────────────────────────────────────────────────────►  OrchestratorCapability
+
+OrchestratorCapability ◄─────────────────────────────────────────────────────
+  │ OrchestratorContract ─────────────────────────────────────────────────────►  CLICapability
+  │ OrchestratorContract ─────────────────────────────────────────────────────►  WebUICapability
+
+UserSessionCapability ◄──────────────────────────────────────────────────────
+  │ UserSessionContract ──────────────────────────────────────────────────────►  WebUICapability
+
+CommunicationAdapterCapability  ◄────────────────────────────────────────────
+  (provides channel adapters consumed by external systems)
+
+
+D-06 — OCTOPUSSYMESSAGE — STRUCTURE &amp; PROCESSING CHAIN
+
+Spec ref: §4.0.2 — OctopussyMessage; §8 — Messaging Architecture
+Purpose: Defines the immutable message type that is the ONLY communication vehicle in the system. Shows all fields and the complete processing chain every message passes through.
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    OctopussyMessage  (frozen=True, slots=True)              │
+│                    octopussy/core/message.py                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Field          Type              Description                               │
+│  ─────────────  ────────────────  ────────────────────────────────────────  │
+│  message_id     UUID              Unique message identifier (uuid4)         │
+│  sender_id      UUID              Agent UUID of sender                      │
+│  recipient_id   UUID              Agent UUID of recipient                   │
+│  message_type   MessageType       TASK | RESULT | CONTROL | EVENT           │
+│  payload        dict              JSON-serializable values only             │
+│  priority       MessagePriority   CRITICAL=0 | HIGH=1 | NORMAL=2 | LOW=3   │
+│  trace_id       UUID              Distributed tracing correlation ID        │
+│  created_at     float             Unix timestamp UTC (time.time())          │
+│  ttl_seconds    int               Time-to-live in seconds (default: 300)    │
+│  signature      bytes             HMAC-SHA256 — MANDATORY, never Optional   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Factory Method: OctopussyMessage.create(sender_id, recipient_id,          │
+│                    message_type, payload, secret: bytes, ...)               │
+│  Verification:   message.verify_signature(secret: bytes) → bool            │
+│                  (constant-time via hmac.compare_digest; never raises)      │
+│  Expiry check:   message.is_expired() → bool                               │
+│                  (time.time() > created_at + ttl_seconds)                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+HMAC SIGNATURE COMPUTATION:
+  sig_data = f"{message_id}{sender_id}{recipient_id}{message_type}
+               {created_at}{ttl_seconds}{priority}".encode("utf-8")
+  signature = hmac.new(secret, sig_data, hashlib.sha256).digest()
+
+MESSAGE PROCESSING CHAIN (Chain of Responsibility in _message_loop):
+═══════════════════════════════════════════════════════════════════
+
+  Inbound OctopussyMessage arrives in inQ
+              │
+              ▼
+  ┌─────────────────────────────────────┐
+  │  STEP 1: verify_signature(secret)   │──── FAIL ──► DROP + log warning
+  └─────────────────────────────────────┘
+              │ PASS
+              ▼
+  ┌─────────────────────────────────────┐
+  │  STEP 2: is_expired()               │──── EXPIRED ► DROP + log warning
+  └─────────────────────────────────────┘
+              │ NOT EXPIRED
+              ▼
+  ┌─────────────────────────────────────┐
+  │  STEP 3: message_type == CONTROL?   │──── YES ──► _handle_control(message)
+  └─────────────────────────────────────┘
+              │ NO (TASK / EVENT)
+              ▼
+  ┌─────────────────────────────────────┐
+  │  STEP 4: scan_prompt(payload)       │──── INJECTION ► DROP + audit log
+  │          (SecurityPort)             │
+  └─────────────────────────────────────┘
+              │ CLEAN
+              ▼
+  ┌─────────────────────────────────────┐
+  │  STEP 5: check_budget(agent_id)     │──── EXHAUSTED ► DROP + notify sender
+  │          (TokenBudgetPort)          │
+  └─────────────────────────────────────┘
+              │ BUDGET OK
+              ▼
+  ┌─────────────────────────────────────┐
+  │  STEP 6: process_task(message)      │──── ERROR ──► AgentState.ERROR
+  │          (subclass override)        │               + DLQ if unrecoverable
+  └─────────────────────────────────────┘
+              │ SUCCESS
+              ▼
+  Result OctopussyMessage.create(...)
+  → placed in outQ → dispatched to MessagingCapability
+
+
+D-07 — AGENT STATE MACHINE
+
+Spec ref: §6 — Actor Model &amp; Agent Architecture
+Purpose: The AgentStateMachine enforces valid state transitions. All invalid transitions must be rejected. Critical for implementing agent_state_machine.py.
+
+                    AgentStateMachine
+                    (octopussy/capabilities/actor/essence/agent_state_machine.py)
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │                                                                         │
+  │                         ┌─────────┐                                    │
+  │                         │ CREATED │  ◄── Initial state on instantiation │
+  │                         └────┬────┘                                    │
+  │                              │ start()                                 │
+  │                              ▼                                         │
+  │                         ┌─────────┐                                    │
+  │          ┌──────────────│  IDLE   │◄─────────────────────┐            │
+  │          │              └────┬────┘                       │            │
+  │          │ pause()           │ message received           │ task done  │
+  │          │                   │ from inQ                   │            │
+  │          ▼                   ▼                            │            │
+  │     ┌────────┐         ┌────────────┐                     │            │
+  │     │ PAUSED │         │ PROCESSING │─────────────────────┘            │
+  │     └────┬───┘         └─────┬──────┘                                 │
+  │          │ resume()          │ unrecoverable error                     │
+  │          │                   ▼                                         │
+  │          └──────────►  ┌─────────┐                                    │
+  │                         │  ERROR  │                                    │
+  │                         └────┬────┘                                    │
+  │                              │ stop() / recovery attempt               │
+  │                              ▼                                         │
+  │                         ┌──────────┐                                   │
+  │     IDLE ──stop()──────►│ STOPPING │                                   │
+  │                         └────┬─────┘                                   │
+  │                              │ all tasks drained                       │
+  │                              ▼                                         │
+  │                         ┌─────────┐                                    │
+  │                         │ STOPPED │  ◄── Terminal state                │
+  │                         └─────────┘                                    │
+  │                                                                         │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+  VALID TRANSITIONS SUMMARY:
+  ┌──────────────┬──────────────┬─────────────────────────────────────────┐
+  │  FROM        │  TO          │  TRIGGER                                │
+  ├──────────────┼──────────────┼─────────────────────────────────────────┤
+  │  CREATED     │  IDLE        │  start() called by AgentLifecycleManager│
+  │  IDLE        │  PROCESSING  │  message dequeued from inQ              │
+  │  PROCESSING  │  IDLE        │  process_task() completes successfully  │
+  │  PROCESSING  │  ERROR       │  unrecoverable exception in process_task│
+  │  IDLE        │  PAUSED      │  pause() CONTROL message received       │
+  │  PAUSED      │  IDLE        │  resume() CONTROL message received      │
+  │  IDLE        │  STOPPING    │  stop() called                          │
+  │  ERROR       │  STOPPING    │  stop() called after error              │
+  │  STOPPING    │  STOPPED     │  all in-flight tasks drained            │
+  └──────────────┴──────────────┴─────────────────────────────────────────┘
+
+  INVALID TRANSITIONS: All other transitions raise InvalidStateTransitionError.
+  PERSISTENCE: State stored in StateStore (SQLite) for crash recovery.
+
+
+D-08 — ACTOR MODEL &amp; AGENT INTERNAL ARCHITECTURE
+
+Spec ref: §6 — Actor Model &amp; Agent Architecture
+Purpose: Shows the complete internal structure of every OctopussyAgent instance, its three asyncio tasks, injected ports, and subtype hierarchy.
+
+OctopussyAgent (ABC)  [octopussy/capabilities/actor/essence/agent_base.py]
+│
+├── SUBTYPE HIERARCHY
+│   ├── StatelessOneShot      — executes once, returns result, terminates
+│   ├── StatefulLoop          — executes repeatedly until stopped; maintains state
+│   ├── ScheduledTaskDaemon   — wakes on cron schedule; executes; sleeps
+│   └── [UserDefinedAgent]    — any user subclass registered via UserAgentExtensionCapability
+│
+└── INTERNAL STRUCTURE (per agent instance)
+    │
+    ├── QUEUES
+    │   ├── inQ   asyncio.PriorityQueue  ◄── receives OctopussyMessage (CRITICAL=0 first)
+    │   └── outQ  asyncio.PriorityQueue  ──► dispatches OctopussyMessage (CRITICAL=0 first)
+    │
+    ├── ASYNCIO TASKS (three dedicated tasks per agent)
+    │   ├── _message_loop()          ◄── consumes from inQ; Chain of Responsibility
+    │   ├── _outbound_dispatch_loop()◄── consumes from outQ; forwards to MessagingCapability
+    │   └── _heartbeat_loop()        ◄── emits heartbeat EVENT every 30 seconds
+    │
+    ├── COMPONENTS
+    │   ├── AgentStateMachine        — enforces valid state transitions
+    │   ├── LoopGuard                — enforces max_iterations ceiling
+    │   │                              raises LoopLimitExceededError when exceeded
+    │   ├── ConversationMemory       — in-memory conversation history for current session
+    │   ├── ReflectionEngine         — implements ReAct / Reflection agentic patterns
+    │   └── AgentContext             — mutable runtime context (agent_id, session_id,
+    │                                  trace_id, spec, iteration); NOT shared between agents
+    │
+    ├── INJECTED PORTS (via inject_dependency() / AgentFactory at creation)
+    │   ├── _llm_port        LLMPort              ◄── from LLMRouterCapability
+    │   ├── _vlm_port        VLMPort | None        ◄── from LLMRouterCapability (if vlm_enabled)
+    │   ├── _memory_port     MemoryPort            ◄── from MemoryCapability
+    │   ├── _rag_port        RAGPort               ◄── from RAGCapability
+    │   ├── _graph_port      GraphPort             ◄── from GraphRAGCapability
+    │   ├── _tool_port       ToolExecutorPort      ◄── from ToolRegistryCapability
+    │   ├── _sandbox_port    SandboxPort           ◄── from SandboxCapability
+    │   ├── _budget_port     TokenBudgetPort       ◄── from TokenBudgetCapability
+    │   ├── _security_port   SecurityPort          ◄── from SecurityCapability
+    │   ├── _messaging       MessagingContract     ◄── from MessagingCapability
+    │   ├── _lifecycle       AgentLifecyclePort    ◄── from AgentLifecycleManagerCapability
+    │   └── _obs_port        ObservabilityPort     ◄── from ObservabilityCapability
+    │
+    ├── REALIZATION ADAPTERS
+    │   ├── LLMPortAdapter    — wraps LLMPort with Circuit Breaker + Retry+Backoff
+    │   ├── VLMPortAdapter    — wraps VLMPort with Circuit Breaker + Retry+Backoff
+    │   ├── MCPClientAdapter  — MCP 2025-11-25 Streamable HTTP client for all tool calls
+    │   └── StateStore        — persists agent state to SQLite
+    │
+    └── SPEC (AgentSpec — frozen dataclass, immutable)
+        ├── agent_id, name, description, agent_type, execution_mode
+        ├── goal, persona, output_format
+        ├── intelligence  (LLMIntelligenceSpec)
+        ├── permissions   (PermissionsSpec — allowed_tools, forbidden_tools, allowed_paths)
+        ├── sandbox       (SandboxSpec — backend, cpu_cores, memory_mb, disk_mb)
+        ├── token_budget  (TokenBudgetSpec)
+        ├── rag           (RAGSpec | None)
+        ├── graph_rag     (GraphRAGSpec | None)
+        ├── scheduler     (SchedulerSpec | None)
+        ├── mcp_servers   (tuple[MCPServerSpec, ...])
+        └── user_agent_type (str | None)  ◄── v5.0: for USER_DEFINED agents
+
+  INVARIANTS:
+  • Agents NEVER communicate via direct method calls — only OctopussyMessage
+  • Agents NEVER share state with other agents
+  • Agents NEVER block the event loop (all methods are async def)
+  • Agents ALWAYS verify inbound message signature before processing
+  • Agents ALWAYS check TTL before processing
+  • Agents ALWAYS check token budget before every LLM call
+  • Agents ALWAYS emit heartbeat every 30 seconds
+  • Agents ALWAYS respect LoopGuard iteration ceiling
+
+
+D-09 — MESSAGING ARCHITECTURE — FULL MESSAGE FLOW
+
+Spec ref: §8 — Messaging Architecture
+Purpose: End-to-end message flow from sender agent through the bus to receiver agent, including the DLQ path. Critical for implementing MessagingCapability and agent queue adapters.
+
+  SENDER AGENT                                                RECEIVER AGENT
+  ┌──────────────────────┐                              ┌──────────────────────┐
+  │                      │                              │                      │
+  │  process_task()      │                              │  _message_loop()     │
+  │  produces result     │                              │  consumes from inQ   │
+  │         │            │                              │        ▲             │
+  │         ▼            │                              │        │             │
+  │  OctopussyMessage    │                              │  inQ   │             │
+  │  .create(            │                              │  (asyncio.Priority   │
+  │    secret=hmac_key   │                              │   Queue)             │
+  │  )                   │                              │        ▲             │
+  │         │            │                              │        │             │
+  │         ▼            │                              │  InboundQueueAdapter │
+  │  outQ                │                              │        ▲             │
+  │  (asyncio.Priority   │                              └────────┼─────────────┘
+  │   Queue)             │                                       │
+  │         │            │                                       │ route by recipient_id
+  │         ▼            │                                       │
+  │  _outbound_dispatch  │                                       │
+  │  _loop()             │                                       │
+  │         │            │                                       │
+  └─────────┼────────────┘                                       │
+            │                                                    │
+            ▼                                                    │
+  ┌─────────────────────────────────────────────────────────────┴──────────┐
+  │                      MessagingCapability                                │
+  │                                                                         │
+  │  ┌──────────────────────────────────────────────────────────────────┐  │
+  │  │  MessageValidator                                                 │  │
+  │  │  • Verifies HMAC-SHA256 signature                                 │  │
+  │  │  • Rejects unsigned or invalid messages                           │  │
+  │  └──────────────────────────────────────────────────────────────────┘  │
+  │                              │                                          │
+  │                              ▼                                          │
+  │  ┌──────────────────────────────────────────────────────────────────┐  │
+  │  │  MessageRouter                                                    │  │
+  │  │  Routes by recipient_id to correct agent's inQ                   │  │
+  │  └──────────────────────────────────────────────────────────────────┘  │
+  │                              │                                          │
+  │            ┌─────────────────┼─────────────────┐                       │
+  │            │                 │                  │                       │
+  │            ▼                 ▼                  ▼                       │
+  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────────┐  │
+  │  │ NATSAdapter  │  │RabbitMQAdapter│  │  InMemoryBusAdapter          │  │
+  │  │ (default)    │  │ (optional)   │  │  (single-node only)          │  │
+  │  │ nats://4222  │  │ amqp://5672  │  │  asyncio queues              │  │
+  │  └──────────────┘  └──────────────┘  └──────────────────────────────┘  │
+  │                                                                         │
+  │  ┌──────────────────────────────────────────────────────────────────┐  │
+  │  │  DeadLetterQueue (DLQ)                                           │  │
+  │  │  • Activated after 3 consecutive delivery failures               │  │
+  │  │  • Stores: full OctopussyMessage + failure_reason + attempt_count│  │
+  │  │            + last_failure_timestamp                              │  │
+  │  │  • Persisted in SQLite (dlq_store.py) — survives restarts        │  │
+  │  │  • NEVER silently discards a message                             │  │
+  │  │  • Replay via: CLI octopussy task replay <id>                    │  │
+  │  │                REST POST /api/v1/dlq/{id}/replay                 │  │
+  │  └──────────────────────────────────────────────────────────────────┘  │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+  PRIORITY ORDERING:
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │  MessagePriority.CRITICAL = 0  ◄── processed/dispatched FIRST           │
+  │  MessagePriority.HIGH     = 1                                            │
+  │  MessagePriority.NORMAL   = 2  ◄── default                              │
+  │  MessagePriority.LOW      = 3  ◄── processed/dispatched LAST            │
+  └──────────────────────────────────────────────────────────────────────────┘
+
+  BACKEND SELECTION (from octopussy.yaml):
+    messaging.backend: "nats"      → NATSAdapter     (DOCKER / KUBERNETES)
+    messaging.backend: "rabbitmq"  → RabbitMQAdapter (alternative)
+    messaging.backend: "in_memory" → InMemoryBusAdapter (SBC / LOCAL)
+
+
+D-10 — SECURITY ZERO-TRUST ENFORCEMENT CHAIN
+
+Spec ref: §10 — Security Architecture
+Purpose: Every inbound request passes through this exact chain in order. Every step is mandatory. Shows the complete security pipeline from transport to agent output. Critical for implementing SecurityCapability and the agent message loop.
+
+════════════════════════════════════════════════════════════════════════════
+                  ZERO-TRUST ENFORCEMENT CHAIN
+════════════════════════════════════════════════════════════════════════════
+
+  INBOUND REQUEST
+  (REST / gRPC / WebSocket / Channel)
+              │
+              ▼
+  ┌───────────────────────────────────────────────────────────────────────┐
+  │  LAYER 1: TRANSPORT SECURITY                                          │
+  │                                                                       │
+  │  mTLS verification                                                    │
+  │  • RESTCommunicationPort  (HTTPS/TLS, port 47200)                    │
+  │  • GRPCCommunicationPort  (gRPC/mTLS, port 47201)                    │
+  │  • WebSocketCommunicationPort (WSS, port 47202)                      │
+  │                                                                       │
+  │  FAIL → Connection rejected at transport layer                        │
+  └───────────────────────────────────────────────────────────────────────┘
+              │ PASS
+              ▼
+  ┌───────────────────────────────────────────────────────────────────────┐
+  │  LAYER 2: AUTHENTICATION                                              │
+  │                                                                       │
+  │  JWT authentication (bearer token)                                    │
+  │  SecurityCapability.authenticate(token) → user_context dict           │
+  │                                                                       │
+  │  FAIL → 401 Unauthorized                                              │
+  └───────────────────────────────────────────────────────────────────────┘
+              │ PASS
+              ▼
+  ┌───────────────────────────────────────────────────────────────────────┐
+  │  LAYER 3: ELEVATED ROLE VERIFICATION (SUPERUSER / ADMIN only)        │
+  │                                                                       │
+  │  TOTP verification                                                    │
+  │  SecurityCapability (totp_required_roles: ["SUPERUSER", "ADMIN"])     │
+  │                                                                       │
+  │  FAIL → 403 Forbidden (TOTP required)                                │
+  └───────────────────────────────────────────────────────────────────────┘
+              │ PASS
+              ▼
+  ┌───────────────────────────────────────────────────────────────────────┐
+  │  LAYER 4: AUTHORIZATION (RBAC — deny-by-default)                     │
+  │                                                                       │
+  │  SecurityCapability.authorize(user_id, resource, action) → bool       │
+  │  • Permissions are explicit allowlists                                │
+  │  • Absence of permission = DENIAL                                     │
+  │                                                                       │
+  │  FAIL → 403 Forbidden                                                │
+  └───────────────────────────────────────────────────────────────────────┘
+              │ PASS
+              ▼
+  ┌───────────────────────────────────────────────────────────────────────┐
+  │  LAYER 5: MESSAGE INTEGRITY (OctopussyMessage)                       │
+  │                                                                       │
+  │  HMAC-SHA256 signature verification                                   │
+  │  OctopussyMessage.verify_signature(secret: bytes) → bool              │
+  │  • Uses hmac.compare_digest() — constant-time (no timing attacks)    │
+  │  • secret: bytes — NEVER str, NEVER None                             │
+  │                                                                       │
+  │  FAIL → DROP message + log warning (never raises)                    │
+  └───────────────────────────────────────────────────────────────────────┘
+              │ PASS
+              ▼
+  ┌───────────────────────────────────────────────────────────────────────┐
+  │  LAYER 6: MESSAGE FRESHNESS                                           │
+  │                                                                       │
+  │  TTL check: OctopussyMessage.is_expired() → bool                     │
+  │  (time.time() > created_at + ttl_seconds)                             │
+  │                                                                       │
+  │  FAIL → DROP message + log warning                                   │
+  └───────────────────────────────────────────────────────────────────────┘
+              │ PASS
+              ▼
+  ┌───────────────────────────────────────────────────────────────────────┐
+  │  LAYER 7: PROMPT INJECTION SCANNING                                  │
+  │                                                                       │
+  │  SecurityCapability.scan_prompt(prompt) → bool                       │
+  │  • Scans payload content before any LLM call                         │
+  │  • 100% of prompts scanned — no exceptions                           │
+  │                                                                       │
+  │  FAIL → DROP message + audit log event                               │
+  └───────────────────────────────────────────────────────────────────────┘
+              │ PASS
+              ▼
+  ┌───────────────────────────────────────────────────────────────────────┐
+  │  LAYER 8: AGENT PROCESSING                                           │
+  │                                                                       │
+  │  process_task(message) executes                                       │
+  │                                                                       │
+  │  LAYER 8a: TOOL PERMISSION CHECK                                     │
+  │  ToolRegistryCapability — allowed_tools allowlist per PermissionsSpec │
+  │  FAIL → tool call rejected; PermissionDeniedError                    │
+  │                                                                       │
+  │  LAYER 8b: SANDBOX EXECUTION (Bulkhead Pattern)                      │
+  │  SandboxCapability — isolated per agent                              │
+  │  CPU: 1.0 cores | Memory: 512 MB | Disk: 1024 MB | Network: disabled │
+  │  FAIL → SandboxExecutionError; agent isolated; no cascade failure     │
+  └───────────────────────────────────────────────────────────────────────┘
+              │ PASS
+              ▼
+  ┌───────────────────────────────────────────────────────────────────────┐
+  │  LAYER 9: OUTPUT GUARDRAILS                                          │
+  │                                                                       │
+  │  SecurityCapability.validate_output(output, policy) → bool           │
+  │                                                                       │
+  │  FAIL → output suppressed; audit log event                           │
+  └───────────────────────────────────────────────────────────────────────┘
+              │ PASS
+              ▼
+  ┌───────────────────────────────────────────────────────────────────────┐
+  │  LAYER 10: RESPONSE SIGNING                                          │
+  │                                                                       │
+  │  OctopussyMessage.create(secret=hmac_secret) on response             │
+  │  Every outbound message is HMAC-SHA256 signed                        │
+  └───────────────────────────────────────────────────────────────────────┘
+              │
+              ▼
+  SIGNED RESPONSE DELIVERED TO CALLER
+
+  HMAC KEY MANAGEMENT:
+  • Keys stored in SecretsCapability (never in config files)
+  • Key rotation: SecretsCapability.rotate_secret()
+  • Secret names configured in octopussy.yaml:
+    security.hmac_secret_name: "hmac_secret"
+    security.jwt_secret_name:  "jwt_secret"
+
+
+D-11 — LLM/VLM ROUTER ARCHITECTURE
+
+Spec ref: §9 — LLM/VLM Port Architecture
+Purpose: Shows how LLMRouterCapability resolves the correct LLM/VLM provider for each agent, including routing strategies, fallback chains, health checking, and GPU detection.
+
+                        LLMRouterCapability
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │                                                                          │
+  │  ┌────────────────────────────────────────────────────────────────────┐ │
+  │  │  RoutingEngine  (Strategy Pattern)                                 │ │
+  │  │                                                                    │ │
+  │  │  AgentSpec.intelligence.routing_strategy selects one of:          │ │
+  │  │                                                                    │ │
+  │  │  COST     ──► minimize cost; prefer cheaper providers              │ │
+  │  │  QUALITY  ──► maximize quality; prefer best models                 │ │
+  │  │  BALANCED ──► balance cost and quality (default)                   │ │
+  │  │  LOCAL    ──► prefer local providers only                          │ │
+  │  │  CLOUD    ──► prefer cloud providers only                          │ │
+  │  └────────────────────────────────────────────────────────────────────┘ │
+  │                              │                                          │
+  │                              ▼                                          │
+  │  ┌────────────────────────────────────────────────────────────────────┐ │
+  │  │  HealthChecker                                                     │ │
+  │  │  • Polls all registered providers periodically                    │ │
+  │  │  • Marks unhealthy providers as unavailable                       │ │
+  │  │  • Healthy providers only are candidates for routing              │ │
+  │  └────────────────────────────────────────────────────────────────────┘ │
+  │                              │                                          │
+  │                              ▼                                          │
+  │  ┌────────────────────────────────────────────────────────────────────┐ │
+  │  │  FallbackChainResolver                                             │ │
+  │  │                                                                    │ │
+  │  │  primary provider ──► fallback provider ──► LLMProviderError      │ │
+  │  │  (AgentSpec.intelligence.provider)                                 │ │
+  │  │  (AgentSpec.intelligence.fallback_provider)                        │ │
+  │  └────────────────────────────────────────────────────────────────────┘ │
+  │                              │                                          │
+  │                              ▼                                          │
+  │  ┌────────────────────────────────────────────────────────────────────┐ │
+  │  │  GPUDetector                                                       │ │
+  │  │  • CUDA detection  (NVIDIA GPUs)                                   │ │
+  │  │  • Metal detection (Apple Silicon)                                 │ │
+  │  │  • ROCm detection  (AMD GPUs)                                      │ │
+  │  │  • Selects optimal local inference backend automatically           │ │
+  │  └────────────────────────────────────────────────────────────────────┘ │
+  └──────────────────────────────────────────────────────────────────────────┘
+
+  LOCAL PROVIDERS (LLMPort implementations):
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  OllamaLLMPort      — REST over HTTP (localhost)                        │
+  │  LMStudioLLMPort    — REST over HTTP (localhost)                        │
+  │  vLLMLLMPort        — REST over HTTP (localhost)                        │
+  │  SGLangLLMPort      — REST over HTTP (localhost)                        │
+  │  HuggingFaceLLMPort — HuggingFace transformers (local)                  │
+  │  MLXLLMPort         — Apple MLX framework (Apple Silicon)               │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+  CLOUD PROVIDERS (LLMPort implementations):
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  OpenAILLMPort      — REST over HTTPS; API key from SecretsCapability   │
+  │  AnthropicLLMPort   — REST over HTTPS; API key from SecretsCapability   │
+  │  GoogleGeminiLLMPort— REST over HTTPS; API key from SecretsCapability   │
+  │  AWSBedrockLLMPort  — AWS SDK over HTTPS; credentials from Secrets      │
+  │  AzureOpenAILLMPort — REST over HTTPS; API key from SecretsCapability   │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+  VLM PROVIDERS (VLMPort implementations — when vlm_enabled=True):
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  OllamaVLMPort      — local vision models (LLaVA, etc.)                 │
+  │  OpenAIVLMPort      — GPT-4V, GPT-4o (cloud)                           │
+  │  AnthropicVLMPort   — Claude 3 vision (cloud)                           │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+  RESILIENCE ADAPTERS (wrap every LLMPort/VLMPort):
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  LLMPortAdapter                                                         │
+  │  ├── Circuit Breaker (CLOSED → OPEN → HALF_OPEN)                        │
+  │  │   • CLOSED:    requests pass through normally                        │
+  │  │   • OPEN:      requests fail fast (no LLM call); fallback triggered  │
+  │  │   • HALF_OPEN: one probe request; success → CLOSED; fail → OPEN      │
+  │  └── Retry + Backoff (transient failure recovery)                       │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+  LLMRequest / LLMCompletion data types:
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  LLMRequest:                                                            │
+  │    messages: tuple[dict, ...]  (role/content pairs)                     │
+  │    model: str                                                           │
+  │    system: str                 (agent persona)                          │
+  │    temperature: float          (from AgentSpec.intelligence)            │
+  │    max_tokens: int             (from AgentSpec.intelligence)            │
+  │                                                                         │
+  │  LLMCompletion:                                                         │
+  │    content: str                (generated text)                         │
+  │    input_tokens: int           (for budget accounting)                  │
+  │    output_tokens: int          (for budget accounting)                  │
+  │    model: str                  (actual model used)                      │
+  │    provider: str               (actual provider used)                   │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+
+D-12 — TEAM PATTERNS — ALL FOUR MULTI-AGENT PATTERNS
+
+Spec ref: §7 — Team Patterns &amp; Multi-Agent Architecture
+Purpose: Shows the exact message flow and agent topology for each of the four team patterns. Critical for implementing the four engine classes in TeamCapability.
+
+════════════════════════════════════════════════════════════════════════════
+  PATTERN 1: COORDINATOR / WORKER
+  Engine: CoordinatorWorkerEngine
+  Config: pattern: "coordinator"
+════════════════════════════════════════════════════════════════════════════
+
+  External Task
+       │
+       ▼
+  ┌─────────────────────┐
+  │   COORDINATOR       │  ◄── receives task; decomposes into subtasks
+  │   Agent             │
+  └──────┬──────────────┘
+         │ OctopussyMessage (TASK) × N subtasks
+         │
+    ┌────┴─────────────────────────────────────────────────────────┐
+    │                                                              │
+    ▼                    ▼                    ▼                    ▼
+  ┌──────────┐       ┌──────────┐       ┌──────────┐       ┌──────────┐
+  │ Worker 1 │       │ Worker 2 │       │ Worker 3 │       │ Worker N │
+  └────┬─────┘       └────┬─────┘       └────┬─────┘       └────┬─────┘
+       │ RESULT            │ RESULT            │ RESULT            │ RESULT
+       └────────────────────┴──────────────────┴──────────────────┘
+                                     │
+                                     ▼
+                          ┌─────────────────────┐
+                          │   COORDINATOR       │  ◄── synthesizes results
+                          │   (synthesis)       │      strategy: coordinator|vote|concat
+                          └─────────────────────┘
+                                     │
+                                     ▼
+                               Final Result
+
+  max_rounds: 3 (configurable)  |  timeout_seconds: 600 (configurable)
+
+════════════════════════════════════════════════════════════════════════════
+  PATTERN 2: PIPELINE
+  Engine: PipelineEngine
+  Config: pattern: "pipeline"
+════════════════════════════════════════════════════════════════════════════
+
+  External Task
+       │
+       ▼
+  ┌──────────┐  RESULT   ┌──────────┐  RESULT   ┌──────────┐  RESULT
+  │ Agent 1  │──────────►│ Agent 2  │──────────►│ Agent 3  │──────────► ...
+  │ (stage 1)│           │ (stage 2)│           │ (stage 3)│
+  └──────────┘           └──────────┘           └──────────┘
+                                                      │
+                                                      ▼
+                                               ┌──────────┐
+                                               │ Agent N  │──► Final Result
+                                               │ (stage N)│
+                                               └──────────┘
+
+  • Output of Agent N becomes the payload of the TASK message to Agent N+1
+  • All messages are OctopussyMessage (TASK type)
+  • Sequential — no parallelism within a pipeline
+
+════════════════════════════════════════════════════════════════════════════
+  PATTERN 3: MESH + BLACKBOARD
+  Engine: MeshBlackboardEngine
+  Config: pattern: "mesh"
+════════════════════════════════════════════════════════════════════════════
+
+  External Task
+       │
+       ▼ (broadcast to all agents)
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │                                                                      │
+  │  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐      │
+  │  │ Agent 1  │◄──►│ Agent 2  │◄──►│ Agent 3  │◄──►│ Agent N  │      │
+  │  └────┬─────┘    └────┬─────┘    └────┬─────┘    └────┬─────┘      │
+  │       │               │               │               │             │
+  │       └───────────────┴───────────────┴───────────────┘             │
+  │                               │                                     │
+  │                               ▼                                     │
+  │  ┌──────────────────────────────────────────────────────────────┐   │
+  │  │  BLACKBOARD  (Redis-backed shared read/write store)          │   │
+  │  │  • All agents can READ and WRITE                             │   │
+  │  │  • Shared knowledge accumulation                             │   │
+  │  │  • Peer-to-peer message exchange via OctopussyMessage        │   │
+  │  └──────────────────────────────────────────────────────────────┘   │
+  │                                                                      │
+  └──────────────────────────────────────────────────────────────────────┘
+       │
+       ▼
+  Result synthesized from Blackboard contents
+
+════════════════════════════════════════════════════════════════════════════
+  PATTERN 4: TREE
+  Engine: TreeEngine
+  Config: pattern: "tree"
+════════════════════════════════════════════════════════════════════════════
+
+  External Task
+       │
+       ▼
+  ┌──────────────────────┐
+  │   ROOT Agent         │  ◄── decomposes task; delegates to children
+  └───────────┬──────────┘
+              │ OctopussyMessage (TASK)
+       ┌──────┴──────┐
+       ▼             ▼
+  ┌─────────┐   ┌─────────┐
+  │ Child 1 │   │ Child 2 │  ◄── may further delegate to grandchildren
+  └────┬────┘   └────┬────┘
+       │             │
+  ┌────┴────┐   ┌────┴────┐
+  ▼         ▼   ▼         ▼
+  Leaf1  Leaf2  Leaf3  Leaf4  ◄── leaf agents execute; return results upward
+
+       │             │
+       └──────┬──────┘
+              ▼
+  ┌──────────────────────┐
+  │   ROOT Agent         │  ◄── synthesizes all child results
+  └──────────────────────┘
+              │
+              ▼
+        Final Result
+
+  • Hierarchical delegation — parent delegates to children recursively
+  • Results flow upward from leaves to root
+  • All messages are OctopussyMessage (TASK / RESULT types)
+
+
+D-13 — MCP INTEGRATION ARCHITECTURE (2025-11-25)
+
+Spec ref: §11 — MCP Integration Architecture
+Purpose: All tool calls in Octopussy are routed exclusively through MCP 2025-11-25 Streamable HTTP transport. This diagram shows the complete MCP call path.
+
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │                         OctopussyAgent                                  │
+  │                                                                          │
+  │  process_task() decides to call a tool                                  │
+  │         │                                                                │
+  │         ▼                                                                │
+  │  ┌─────────────────────────────────────────────────────────────────┐    │
+  │  │  MCPClientAdapter  (mcp_client_adapter.py)                      │    │
+  │  │                                                                 │    │
+  │  │  1. Validates MCP-Protocol-Version: 2025-11-25 header           │    │
+  │  │     on ALL outbound requests (unsupported versions → error)     │    │
+  │  │                                                                 │    │
+  │  │  2. Sends tool call request via Streamable HTTP POST            │    │
+  │  │                                                                 │    │
+  │  │  3. Streams response via SSE (Server-Sent Events)               │    │
+  │  │                                                                 │    │
+  │  │  4. Routes to appropriate MCP server:                           │    │
+  │  └─────────────────────────────────────────────────────────────────┘    │
+  └──────────────────────────────────────────────────────────────────────────┘
+                    │                          │
+                    ▼                          ▼
+  ┌─────────────────────────┐    ┌─────────────────────────────────────────┐
+  │  OctopussyMCPServer     │    │  External MCP Servers                   │
+  │  (built-in tools)       │    │  (per MCPServerSpec in AgentSpec)       │
+  │  PluginCapability /     │    │                                         │
+  │  mcp_server.py          │    │  • Any MCP 2025-11-25 compliant server  │
+  │                         │    │  • Configured per-agent in agent.md     │
+  │  Serves all built-in    │    │  • URL, auth, and capabilities defined  │
+  │  tools:                 │    │    in MCPServerSpec                     │
+  │  • web_search           │    │                                         │
+  │  • web_download         │    │  MCPServerSpec fields:                  │
+  │  • file_read/write/list │    │    url: str                             │
+  │  • os_command           │    │    name: str                            │
+  │  • python_exec          │    │    auth_secret_name: str | None         │
+  │  • memory_store/retrieve│    │    capabilities: tuple[str, ...]        │
+  │  • rag_ingest/retrieve  │    │                                         │
+  │  • graph_query/upsert   │    └─────────────────────────────────────────┘
+  │  • mail_send            │
+  │  • calendar_read/write  │
+  │  • ui_automation        │
+  │  • speech_transcribe    │
+  │  • speech_synthesize    │
+  └─────────────────────────┘
+
+  MCP PROTOCOL DETAILS:
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  Protocol Version:  MCP 2025-11-25                                      │
+  │  Transport:         Streamable HTTP                                     │
+  │  Request method:    HTTP POST                                           │
+  │  Response method:   SSE (Server-Sent Events) streaming                 │
+  │  Header required:   MCP-Protocol-Version: 2025-11-25                   │
+  │  Python package:    mcp ≥ 1.6                                           │
+  │                                                                         │
+  │  RULE: LLM-dependent tool calling mechanisms are NOT used.             │
+  │         All tool calls go through MCPClientAdapter exclusively.         │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+  COMMUNICATION PORT:
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  MCPCommunicationPort                                                   │
+  │  • Provided by: PluginCapability (OctopussyMCPServer)                  │
+  │                 ToolRegistryCapability                                  │
+  │  • Validates MCP-Protocol-Version: 2025-11-25 on all requests          │
+  │  • Unsupported versions → clear error response                         │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+
+D-14 — PLUGIN ARCHITECTURE &amp; PLUGIN LIFECYCLE
+
+Spec ref: §15 — Plugin Architecture
+Purpose: Shows all 10 plugin types, the plugin manifest format, and the complete plugin lifecycle from load to hot-reload to unload.
+
+  PLUGIN TYPES (PluginType enum — 10 types):
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  Type                    Purpose                                        │
+  │  ──────────────────────  ──────────────────────────────────────────────│
+  │  TOOL_PLUGIN             Add new tools to ToolRegistryCapability        │
+  │  LLM_ADAPTER_PLUGIN      Add new LLM provider adapters                 │
+  │  VLM_ADAPTER_PLUGIN      Add new VLM provider adapters                 │
+  │  COMM_ADAPTER_PLUGIN     Add new communication channel adapters        │
+  │  VECTOR_DB_PLUGIN        Add new vector database backends               │
+  │  GRAPH_DB_PLUGIN         Add new graph database backends                │
+  │  MCP_SERVER_PLUGIN       Register new MCP server endpoints             │
+  │  INFERENCE_ENGINE_PLUGIN Add new local inference engine backends        │
+  │  PROMPT_PATTERN_PLUGIN   Add new prompt patterns to PromptEngine        │
+  │  USER_AGENT_PLUGIN       Register user-defined OctopussyAgent subclasses│
+  │                          (NEW in v5.0)                                  │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+  PLUGIN MANIFEST (plugin.json — required in every plugin directory):
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  {                                                                      │
+  │    "plugin_id":              "my_plugin",                               │
+  │    "plugin_type":            "USER_AGENT_PLUGIN",                       │
+  │    "version":                "1.0.0",                                   │
+  │    "entry_module":           "my_package.my_module",                    │
+  │    "agent_type":             "my_custom_agent",  (USER_AGENT_PLUGIN)    │
+  │    "agent_class":            "MyCustomAgent",    (USER_AGENT_PLUGIN)    │
+  │    "description":            "A user-defined agent.",                   │
+  │    "schema_version":         "5.0",                                     │
+  │    "min_octopussy_version":  "5.0"                                      │
+  │  }                                                                      │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+  PLUGIN LIFECYCLE:
+  ══════════════════════════════════════════════════════════════════════════
+
+  LOAD:  PluginCapability.load_plugin(plugin_dir)
+         │
+         ├── 1. Read and validate plugin.json schema
+         │        FAIL → PluginValidationError (plugin not loaded)
+         │
+         ├── 2. Import entry_module (dynamic Python import)
+         │        FAIL → PluginImportError
+         │
+         ├── 3. Type-specific registration:
+         │        │
+         │        ├── USER_AGENT_PLUGIN:
+         │        │   └── UserAgentExtensionCapability
+         │        │       .register_agent_class(agent_type, agent_class)
+         │        │
+         │        ├── TOOL_PLUGIN:
+         │        │   └── ToolRegistryCapability.register_tool(descriptor)
+         │        │
+         │        ├── LLM_ADAPTER_PLUGIN:
+         │        │   └── LLMRouterCapability.register_provider(adapter)
+         │        │
+         │        └── [other types: analogous registration]
+         │
+         └── 4. Register in PluginRegistry (plugin_registry.py)
+                  → plugin is now active
+
+  HOT-RELOAD:  PluginCapability.hot_reload_plugin(plugin_id)
+         │
+         ├── 1. Unload current version (gracefully)
+         ├── 2. Re-import updated module
+         ├── 3. Re-register with updated implementation
+         └── 4. Zero system restart required
+
+  UNLOAD:  PluginCapability.unload_plugin(plugin_id)
+         │
+         ├── 1. Deregister from type-specific registry
+         ├── 2. Remove from PluginRegistry
+         └── 3. Clean up imported module references
+
+  PluginCapability NUCLEUS:
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  Essence:                                                               │
+  │    PluginRegistry      — catalogue of loaded plugins                   │
+  │    HotReloadManager    — manages live plugin replacement                │
+  │                                                                         │
+  │  Realization:                                                           │
+  │    PythonModuleLoader  — dynamic Python module import                  │
+  │    PluginStateStore    — persists plugin metadata (SQLite)              │
+  │                                                                         │
+  │  Adaptation:                                                            │
+  │    PluginAdapter       — implements PluginContract                      │
+  │    OctopussyMCPServer  — MCP 2025-11-25 server for built-in tools      │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+
+D-15 — DEPLOYMENT ARCHITECTURE — FOUR PROFILES
+
+Spec ref: §12 — Deployment Architecture
+Purpose: Shows what infrastructure components are used in each of the four deployment profiles. Critical for implementing deployment configuration and infrastructure setup.
+
+  DEPLOYMENT PROFILES (DeploymentProfile enum):
+  ════════════════════════════════════════════════════════════════════════
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  PROFILE: SBC  (Raspberry Pi, Jetson Nano)                             │
+  │  Config:  deployment_profile: "SBC"                                    │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │  Component          Backend                                             │
+  │  ─────────────────  ──────────────────────────────────────────────────  │
+  │  Message Bus        InMemoryBusAdapter (asyncio queues, in-process)    │
+  │  Memory Store       SQLite (/var/octopussy/memory.db)                  │
+  │  RAG Backend        ChromaDB (local)                                   │
+  │  Graph Backend      (disabled or local Neo4j)                          │
+  │  LLM Providers      Local only (Ollama, LMStudio, HuggingFace, MLX)   │
+  │  Sandbox            seccomp-BPF or macos_sandbox                       │
+  │  DLQ Store          SQLite                                             │
+  │  Secrets            Local encrypted store                              │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  PROFILE: LOCAL  (Developer workstation)                               │
+  │  Config:  deployment_profile: "LOCAL"                                  │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │  Component          Backend                                             │
+  │  ─────────────────  ──────────────────────────────────────────────────  │
+  │  Message Bus        InMemoryBusAdapter OR NATS (nats://localhost:4222) │
+  │  Memory Store       SQLite                                             │
+  │  RAG Backend        ChromaDB (local, port 8000)                        │
+  │  Graph Backend      Neo4j (bolt://localhost:7687)                      │
+  │  LLM Providers      Local + Cloud (all providers)                      │
+  │  Sandbox            Docker (local daemon) or seccomp                   │
+  │  DLQ Store          SQLite                                             │
+  │  Secrets            Local encrypted store                              │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  PROFILE: DOCKER  (Docker Compose)                                     │
+  │  Config:  deployment_profile: "DOCKER"                                 │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │  Component          Backend                                             │
+  │  ─────────────────  ──────────────────────────────────────────────────  │
+  │  Message Bus        NATS (nats://nats:4222)                            │
+  │  Memory Store       PostgreSQL (asyncpg)                               │
+  │  RAG Backend        ChromaDB or PGVector                               │
+  │  Graph Backend      Neo4j                                              │
+  │  LLM Providers      All (local + cloud)                                │
+  │  Sandbox            Docker (container-in-container)                    │
+  │  DLQ Store          PostgreSQL                                         │
+  │  Secrets            Local encrypted store or Vault                     │
+  │  Cache              Redis                                              │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  PROFILE: KUBERNETES  (Production cluster)                             │
+  │  Config:  deployment_profile: "KUBERNETES"                             │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │  Component          Backend                                             │
+  │  ─────────────────  ──────────────────────────────────────────────────  │
+  │  Message Bus        NATS cluster (JetStream persistence)               │
+  │  Memory Store       PostgreSQL (HA, connection pooling)                │
+  │  RAG Backend        PGVector or Weaviate or Qdrant or Milvus           │
+  │  Graph Backend      Neo4j cluster or ArangoDB or TigerGraph            │
+  │  LLM Providers      All (local GPU nodes + cloud)                      │
+  │  Sandbox            gVisor (runsc) — strongest isolation               │
+  │  DLQ Store          PostgreSQL                                         │
+  │  Secrets            HashiCorp Vault                                    │
+  │  Cache              Redis cluster                                      │
+  │  Observability      OTLP endpoint (Jaeger/Tempo) + Prometheus          │
+  │  Scaling            Horizontal (stateless agents, NATS clustering)     │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+  NETWORK PORTS (all profiles):
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  47200  REST API (HTTPS/TLS)       — OrchestratorCapability            │
+  │  47201  gRPC (mTLS)                — CommunicationAdapterCapability     │
+  │  47202  WebSocket (WSS)            — WebUICapability real-time updates  │
+  │   9090  Prometheus metrics         — ObservabilityCapability            │
+  │   4222  NATS message bus           — MessagingCapability (NATS backend) │
+  │   5672  RabbitMQ AMQP              — MessagingCapability (RabbitMQ)     │
+  │   4317  OTLP gRPC endpoint         — ObservabilityCapability exporter   │
+  │   8000  ChromaDB REST              — RAGCapability (ChromaDB backend)   │
+  │   7687  Neo4j Bolt                 — GraphRAGCapability                 │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+  SAME AGENT DEFINITIONS RUN UNCHANGED ON ALL PROFILES:
+  (agent.md, persona.md, goal.md, permissions.md — profile-agnostic)
+
+
+D-16 — PORT INTERFACE TAXONOMY
+
+Spec ref: §4.0.3 — Port Interfaces (Complete)
+Purpose: Complete catalogue of all port interfaces in the system, who provides them, and who consumes them. Essential for implementing ports.py, llm_ports.py, rag_ports.py, graph_ports.py, communication_ports.py.
+
+  ALL PORT INTERFACES IN OCTOPUSSY v5.0
+  ═══════════════════════════════════════════════════════════════════════════
+
+  ┌──────────────────────────┬───────────────────────────────┬─────────────────────────────────────────┐
+  │  Port / Contract         │  Provided By                  │  Consumed By                            │
+  ├──────────────────────────┼───────────────────────────────┼─────────────────────────────────────────┤
+  │  ObservabilityPort       │  ObservabilityCapability      │  ALL 26 other Capabilities              │
+  │  SecurityPort            │  SecurityCapability           │  Messaging, ToolRegistry, Actor,        │
+  │                          │                               │  AgentFactory, CommAdapter,             │
+  │                          │                               │  Orchestrator, UserSession              │
+  │  SecretsPort             │  SecretsCapability            │  LLMRouter, Security, Observability     │
+  │  ConfigurationPort       │  ConfigurationCapability      │  14 Capabilities (most)                 │
+  │  MessagingContract       │  MessagingCapability          │  Actor, Team, CommAdapter,              │
+  │                          │                               │  Scheduler, Orchestrator                │
+  │  DLQPort                 │  MessagingCapability          │  Orchestrator (DLQ management)          │
+  │  AgentLifecyclePort      │  AgentLifecycleManagerCap.    │  Actor, AgentFactory, Team,             │
+  │                          │                               │  Orchestrator                           │
+  │  ToolExecutorPort        │  ToolRegistryCapability       │  ActorCapability, AgentFactory          │
+  │  SandboxPort             │  SandboxCapability            │  ToolRegistry, Actor, AgentFactory      │
+  │  MemoryPort              │  MemoryCapability             │  Actor, AgentFactory, RAG, Team         │
+  │  TokenBudgetPort         │  TokenBudgetCapability        │  Actor, AgentFactory                    │
+  │  RAGPort                 │  RAGCapability                │  Actor, AgentFactory                    │
+  │  GraphPort               │  GraphRAGCapability           │  Actor, AgentFactory                    │
+  │  LLMPort                 │  LLMRouterCapability          │  ActorCapability                        │
+  │  VLMPort                 │  LLMRouterCapability          │  ActorCapability (if vlm_enabled)       │
+  │  LLMRouterContract       │  LLMRouterCapability          │  AgentFactory, CritiqueCapability       │
+  │  PluginContract          │  PluginCapability             │  ToolRegistry, LLMRouter,               │
+  │                          │                               │  PromptEngine, UserAgentExtension,      │
+  │                          │                               │  CommAdapter                            │
+  │  UserAgentRegistryPort   │  UserAgentExtensionCap.       │  AgentFactoryCapability                 │
+  │  AgentFactoryContract    │  AgentFactoryCapability       │  Team, Orchestrator                     │
+  │  TeamContract            │  TeamCapability               │  OrchestratorCapability                 │
+  │  OrchestratorContract    │  OrchestratorCapability       │  CLICapability, WebUICapability         │
+  │  UserSessionContract     │  UserSessionCapability        │  WebUICapability                        │
+  │  ActorContract           │  ActorCapability              │  AgentFactory (at creation)             │
+  ├──────────────────────────┼───────────────────────────────┼─────────────────────────────────────────┤
+  │  COMMUNICATION PORTS     │                               │                                         │
+  ├──────────────────────────┼───────────────────────────────┼─────────────────────────────────────────┤
+  │  NATSCommunicationPort   │  MessagingCapability          │  Agent outbound dispatch                │
+  │  RabbitMQCommunicationPort│ MessagingCapability          │  Agent outbound dispatch                │
+  │  InMemoryCommunicationPort│ MessagingCapability          │  Agent outbound dispatch (single-node)  │
+  │  RESTCommunicationPort   │  CommAdapterCapability        │  External REST clients (port 47200)     │
+  │  GRPCCommunicationPort   │  CommAdapterCapability        │  External gRPC clients (port 47201)     │
+  │  WebSocketCommunicationPort│CommAdapterCapability        │  WebUI real-time (port 47202)           │
+  │  MCPCommunicationPort    │  PluginCapability             │  MCPClientAdapter (tool calls)          │
+  ├──────────────────────────┼───────────────────────────────┼─────────────────────────────────────────┤
+  │  RAG PORT VARIANTS       │                               │                                         │
+  ├──────────────────────────┼───────────────────────────────┼─────────────────────────────────────────┤
+  │  ChromaDBRAGPort         │  RAGCapability                │  ActorCapability (default)              │
+  │  PGVectorRAGPort         │  RAGCapability                │  ActorCapability                        │
+  │  WeaviateRAGPort         │  RAGCapability                │  ActorCapability                        │
+  │  QdrantRAGPort           │  RAGCapability                │  ActorCapability                        │
+  │  MilvusRAGPort           │  RAGCapability                │  ActorCapability                        │
+  ├──────────────────────────┼───────────────────────────────┼─────────────────────────────────────────┤
+  │  GRAPH PORT VARIANTS     │                               │                                         │
+  ├──────────────────────────┼───────────────────────────────┼─────────────────────────────────────────┤
+  │  Neo4jGraphPort          │  GraphRAGCapability           │  ActorCapability (default)              │
+  │  ArangoDBGraphPort       │  GraphRAGCapability           │  ActorCapability                        │
+  │  TigerGraphGraphPort     │  GraphRAGCapability           │  ActorCapability                        │
+  └──────────────────────────┴───────────────────────────────┴─────────────────────────────────────────┘
+
+  PORT ABSTRACT BASE SIGNATURES (key methods):
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  MemoryPort:      store(agent_id, key, value)                          │
+  │                   retrieve(agent_id, key) → str|None                   │
+  │                   search(agent_id, query, top_k) → list[dict]          │
+  │                   delete(agent_id, key)                                │
+  │                   clear(agent_id)                                      │
+  │                                                                         │
+  │  RAGPort:         ingest(collection_name, documents, metadata) → int   │
+  │                   retrieve(collection_name, query, top_k) → list[dict] │
+  │                   delete_collection(collection_name)                   │
+  │                                                                         │
+  │  GraphPort:       query(cypher, parameters) → list[dict]               │
+  │                   upsert_node(label, properties) → str                 │
+  │                   upsert_edge(from_id, to_id, relation, properties)    │
+  │                   delete_node(node_id)                                 │
+  │                                                                         │
+  │  SandboxPort:     provision(agent_id, spec) → str                      │
+  │                   execute(agent_id, command, timeout_sec) → dict       │
+  │                   destroy(agent_id)                                    │
+  │                                                                         │
+  │  AgentLifecyclePort: register_agent(agent_id, spec)                    │
+  │                      deregister_agent(agent_id)                        │
+  │                      transition_state(agent_id, new_state)             │
+  │                      get_state(agent_id) → AgentState                  │
+  │                      list_agents() → list[AgentInfo]                   │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+
+D-17 — AGENT CREATION WORKFLOW (AGENTFACTORY)
+
+Spec ref: §4.2 — AgentFactoryCapability
+Purpose: Complete step-by-step workflow for creating an agent from a configuration directory. Shows all validation, construction, and registration steps.
+
+  TRIGGER: OrchestratorCapability.create_agent(config_dir)
+           OR: CLI  octopussy agent create <config_dir>
+           OR: REST POST /api/v1/agents  {"config_dir": "..."}
+                              │
+                              ▼
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │                    AgentFactoryCapability                               │
+  │                                                                         │
+  │  STEP 1: VALIDATE CONFIG DIRECTORY                                     │
+  │  ┌─────────────────────────────────────────────────────────────────┐   │
+  │  │  validate_agent_config_dir(config_dir)                          │   │
+  │  │                                                                 │   │
+  │  │  MarkdownConfigParser reads:                                    │   │
+  │  │    agent.md       — agent_type, execution_mode, output_format   │   │
+  │  │    persona.md     — persona text                                │   │
+  │  │    goal.md        — goal text                                   │   │
+  │  │    permissions.md — allowed_tools, forbidden_tools, paths       │   │
+  │  │                                                                 │   │
+  │  │  JSONFileReader reads:                                          │   │
+  │  │    tools.json     — tool descriptors                            │   │
+  │  │    mcp_servers.json — MCPServerSpec list                        │   │
+  │  │                                                                 │   │
+  │  │  AgentConfigValidator validates schema                          │   │
+  │  │  Returns: list[str] of errors (empty = valid)                   │   │
+  │  │                                                                 │   │
+  │  │  FAIL (errors > 0) → raise AgentConfigurationError             │   │
+  │  └─────────────────────────────────────────────────────────────────┘   │
+  │                              │ PASS                                     │
+  │                              ▼                                          │
+  │  STEP 2: BUILD AgentSpec                                               │
+  │  ┌─────────────────────────────────────────────────────────────────┐   │
+  │  │  AgentSpecBuilder.build(config_dir)                             │   │
+  │  │                                                                 │   │
+  │  │  Constructs (frozen dataclass):                                 │   │
+  │  │    AgentSpec(                                                   │   │
+  │  │      agent_id        = uuid4(),  ← always fresh UUID           │   │
+  │  │      name            = ...,                                     │   │
+  │  │      agent_type      = AgentType.STATEFUL_LOOP | ...,          │   │
+  │  │      intelligence    = LLMIntelligenceSpec(...),               │   │
+  │  │      permissions     = PermissionsSpec(...),                   │   │
+  │  │      sandbox         = SandboxSpec(...),                       │   │
+  │  │      token_budget    = TokenBudgetSpec(...),                   │   │
+  │  │      rag             = RAGSpec(...) | None,                    │   │
+  │  │      graph_rag       = GraphRAGSpec(...) | None,               │   │
+  │  │      scheduler       = SchedulerSpec(...) | None,              │   │
+  │  │      mcp_servers     = tuple[MCPServerSpec, ...],              │   │
+  │  │      user_agent_type = "my_type" | None,  ← v5.0              │   │
+  │  │    )                                                            │   │
+  │  └─────────────────────────────────────────────────────────────────┘   │
+  │                              │                                          │
+  │                              ▼                                          │
+  │  STEP 3: INSTANTIATE AGENT                                             │
+  │  ┌─────────────────────────────────────────────────────────────────┐   │
+  │  │  AgentInstantiator.instantiate(spec)                            │   │
+  │  │                                                                 │   │
+  │  │  if spec.agent_type == AgentType.USER_DEFINED:                  │   │
+  │  │    agent_class = UserAgentRegistryPort                          │   │
+  │  │                    .resolve_agent_class(spec.user_agent_type)   │   │
+  │  │  elif spec.agent_type == AgentType.STATELESS_ONE_SHOT:          │   │
+  │  │    agent_class = StatelessOneShot                               │   │
+  │  │  elif spec.agent_type == AgentType.STATEFUL_LOOP:               │   │
+  │  │    agent_class = StatefulLoop                                   │   │
+  │  │  elif spec.agent_type == AgentType.SCHEDULED_TASK_DAEMON:       │   │
+  │  │    agent_class = ScheduledTaskDaemon                            │   │
+  │  │                                                                 │   │
+  │  │  agent = agent_class(spec)                                      │   │
+  │  └─────────────────────────────────────────────────────────────────┘   │
+  │                              │                                          │
+  │                              ▼                                          │
+  │  STEP 4: INJECT PORTS INTO AGENT                                       │
+  │  ┌─────────────────────────────────────────────────────────────────┐   │
+  │  │  Inject all required ports into the agent instance:             │   │
+  │  │    agent._llm_port     = LLMRouterCapability                    │   │
+  │  │                            .resolve_llm_port(spec.intelligence) │   │
+  │  │    agent._memory_port  = MemoryCapability (MemoryPort)          │   │
+  │  │    agent._rag_port     = RAGCapability (RAGPort)                │   │
+  │  │    agent._graph_port   = GraphRAGCapability (GraphPort)         │   │
+  │  │    agent._tool_port    = ToolRegistryCapability (ToolExecutorPort)│  │
+  │  │    agent._sandbox_port = SandboxCapability (SandboxPort)        │   │
+  │  │    agent._budget_port  = TokenBudgetCapability (TokenBudgetPort)│   │
+  │  │    agent._security_port= SecurityCapability (SecurityPort)      │   │
+  │  │    agent._messaging    = MessagingCapability (MessagingContract) │   │
+  │  │    agent._lifecycle    = AgentLifecycleManagerCap. (LifecyclePort)│  │
+  │  │    agent._obs_port     = ObservabilityCapability (ObsPort)      │   │
+  │  └─────────────────────────────────────────────────────────────────┘   │
+  │                              │                                          │
+  │                              ▼                                          │
+  │  STEP 5: REGISTER AGENT                                                │
+  │  ┌─────────────────────────────────────────────────────────────────┐   │
+  │  │  AgentLifecycleManagerCapability                                │   │
+  │  │    .register_agent(spec.agent_id, spec)                         │   │
+  │  │                                                                 │   │
+  │  │  MessagingCapability                                            │   │
+  │  │    .subscribe(spec.agent_id, agent.inQ)                         │   │
+  │  │                                                                 │   │
+  │  │  AgentSpecCache.cache(spec.agent_id, spec)                      │   │
+  │  └─────────────────────────────────────────────────────────────────┘   │
+  │                              │                                          │
+  │                              ▼                                          │
+  │  STEP 6: START AGENT                                                   │
+  │  ┌─────────────────────────────────────────────────────────────────┐   │
+  │  │  agent.start()                                                  │   │
+  │  │  • Transitions state: CREATED → IDLE                            │   │
+  │  │  • Launches _message_loop() asyncio task                        │   │
+  │  │  • Launches _outbound_dispatch_loop() asyncio task              │   │
+  │  │  • Launches _heartbeat_loop() asyncio task                      │   │
+  │  └─────────────────────────────────────────────────────────────────┘   │
+  │                              │                                          │
+  │                              ▼                                          │
+  │  RETURN: AgentHandle(agent_id=..., name=..., agent_type=...)           │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+
+D-18 — TOOL EXECUTION WORKFLOW
+
+Spec ref: §5 — Built-in Tools Catalogue; §11 — MCP Integration
+Purpose: Complete workflow for a tool call from agent decision to sandboxed execution and result return.
+
+  TRIGGER: Agent's process_task() decides to call a tool
+                              │
+                              ▼
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  STEP 1: PERMISSION CHECK                                               │
+  │                                                                         │
+  │  ToolRegistryCapability.PermissionChecker                               │
+  │  • Checks tool_id against PermissionsSpec.allowed_tools                 │
+  │  • Checks tool_id against PermissionsSpec.forbidden_tools               │
+  │  • Absence of permission = DENIAL                                       │
+  │                                                                         │
+  │  FAIL → PermissionDeniedError (tool call aborted)                      │
+  └─────────────────────────────────────────────────────────────────────────┘
+                              │ PASS
+                              ▼
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  STEP 2: INPUT VALIDATION                                               │
+  │                                                                         │
+  │  ToolRegistryCapability.ToolResultValidator                             │
+  │  • Validates tool call input against tool's JSON schema                 │
+  │                                                                         │
+  │  FAIL → ToolInputValidationError                                        │
+  └─────────────────────────────────────────────────────────────────────────┘
+                              │ PASS
+                              ▼
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  STEP 3: MCP ROUTING                                                    │
+  │                                                                         │
+  │  MCPClientAdapter                                                       │
+  │  • Adds header: MCP-Protocol-Version: 2025-11-25                       │
+  │  • Sends HTTP POST to OctopussyMCPServer (built-in tools)              │
+  │    OR to External MCP Server (per MCPServerSpec)                        │
+  │  • Streams response via SSE                                             │
+  └─────────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  STEP 4: SANDBOX PROVISIONING (if tool requires sandbox)               │
+  │                                                                         │
+  │  SandboxCapability.provision(agent_id, spec)                           │
+  │  • Creates isolated execution environment per agent                    │
+  │  • Applies resource limits:                                            │
+  │    CPU: 1.0 cores | Memory: 512 MB | Disk: 1024 MB | Network: disabled │
+  │  • Backend: Docker | gVisor | seccomp | macOS sandbox                  │
+  └─────────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  STEP 5: SANDBOXED EXECUTION                                            │
+  │                                                                         │
+  │  SandboxCapability.execute(agent_id, command, timeout_sec=30)          │
+  │  • Tool runs in isolated subprocess / container                        │
+  │  • Timeout enforced (default: 30 seconds)                              │
+  │  • Network access: disabled by default (explicit allowlist required)   │
+  │  • A misbehaving tool in Agent A CANNOT affect Agent B or host system  │
+  └─────────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  STEP 6: OUTPUT VALIDATION                                              │
+  │                                                                         │
+  │  ToolRegistryCapability.ToolResultValidator                             │
+  │  • Validates tool output against tool's output JSON schema              │
+  └─────────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  STEP 7: SANDBOX CLEANUP (optional, per tool)                          │
+  │                                                                         │
+  │  SandboxCapability.destroy(agent_id)                                   │
+  │  • Tears down sandbox if per-call isolation is configured              │
+  └─────────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+  Tool result returned to process_task() for incorporation into LLM context
+
+  BUILT-IN TOOLS REQUIRING SANDBOX:
+  web_search, web_download, file_read, file_write, file_list, file_delete,
+  os_command, python_exec, rag_ingest, rag_retrieve, graph_query,
+  graph_upsert, mail_send, calendar_read, calendar_write, ui_automation
+
+  BUILT-IN TOOLS NOT REQUIRING SANDBOX:
+  memory_store, memory_retrieve, memory_search,
+  speech_transcribe, speech_synthesize
+
+
+D-19 — USER AGENT EXTENSION FLOW (v5.0)
+
+Spec ref: §4.26 — UserAgentExtensionCapability; §15 — Plugin Architecture
+Purpose: Complete workflow for registering and using a user-defined agent class. New in v5.0. Critical for implementing UserAgentExtensionCapability and the USER_AGENT_PLUGIN plugin type.
+
+  ══════════════════════════════════════════════════════════════════════════
+  PHASE A: PLUGIN REGISTRATION (at startup or hot-reload)
+  ══════════════════════════════════════════════════════════════════════════
+
+  User creates plugin directory:
+  my_plugin/
+  ├── plugin.json                    ← manifest
+  └── my_package/
+      └── research_agent.py          ← OctopussyAgent subclass
+
+  plugin.json:
+  {
+    "plugin_id":   "research_plugin",
+    "plugin_type": "USER_AGENT_PLUGIN",
+    "version":     "1.0.0",
+    "entry_module":"my_package.research_agent",
+    "agent_type":  "research_agent",
+    "agent_class": "ResearchAgent",
+    "schema_version": "5.0",
+    "min_octopussy_version": "5.0"
+  }
+
+  octopussy.yaml:
+  user_agent_extension:
+    plugin_dirs: ["./my_plugin/"]    ← loaded at startup
+
+  REGISTRATION FLOW:
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │                                                                         │
+  │  PluginCapability.load_plugin("./my_plugin/")                          │
+  │         │                                                               │
+  │         ├── 1. Validate plugin.json                                    │
+  │         ├── 2. Import my_package.research_agent                        │
+  │         ├── 3. plugin_type == USER_AGENT_PLUGIN:                       │
+  │         │       │                                                       │
+  │         │       ▼                                                       │
+  │         │  UserAgentExtensionCapability                                 │
+  │         │  .register_agent_class(                                       │
+  │         │      agent_type  = "research_agent",                         │
+  │         │      agent_class = ResearchAgent                             │
+  │         │  )                                                            │
+  │         │       │                                                       │
+  │         │       ├── AgentClassValidator validates:                      │
+  │         │       │   • ResearchAgent is subclass of OctopussyAgent       │
+  │         │       │   • process_task() method is defined                  │
+  │         │       │   • _dispatch_outbound() method is defined            │
+  │         │       │   FAIL → AgentClassValidationError                   │
+  │         │       │                                                       │
+  │         │       └── UserAgentRegistry stores:                           │
+  │         │           {"research_agent": ResearchAgent}                  │
+  │         │                                                               │
+  │         └── 4. Register in PluginRegistry                              │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+  ══════════════════════════════════════════════════════════════════════════
+  PHASE B: AGENT CREATION USING USER-DEFINED TYPE
+  ══════════════════════════════════════════════════════════════════════════
+
+  User creates agent config directory:
+  my_research_config/
+  ├── agent.md         ← agent_type: USER_DEFINED
+  │                      user_agent_type: research_agent
+  ├── persona.md
+  ├── goal.md
+  └── permissions.md
+
+  octopussy agent create ./my_research_config/
+         │
+         ▼
+  AgentFactoryCapability.create_agent_from_config("./my_research_config/")
+         │
+         ├── MarkdownConfigParser reads agent.md:
+         │     agent_type:      USER_DEFINED
+         │     user_agent_type: research_agent
+         │
+         ├── AgentSpec built with:
+         │     agent_type      = AgentType.USER_DEFINED
+         │     user_agent_type = "research_agent"
+         │
+         └── AgentInstantiator:
+               agent_class = UserAgentRegistryPort
+                               .resolve_agent_class("research_agent")
+               → returns ResearchAgent class
+               agent = ResearchAgent(spec)
+               → all security, lifecycle, messaging guarantees inherited
+
+  ══════════════════════════════════════════════════════════════════════════
+  PHASE C: RUNTIME — USER AGENT BEHAVES IDENTICALLY TO BUILT-IN AGENTS
+  ══════════════════════════════════════════════════════════════════════════
+
+  ResearchAgent (OctopussyAgent subclass)
+  ├── Inherits: _message_loop(), _heartbeat_loop(), _outbound_dispatch_loop()
+  ├── Inherits: all security checks (sig verify, TTL, injection scan, budget)
+  ├── Inherits: all injected ports (LLM, Memory, RAG, Graph, Tools, etc.)
+  ├── Inherits: AgentStateMachine (CREATED→IDLE→PROCESSING→...)
+  └── Overrides: process_task(message) → custom business logic
+
+  UserAgentExtensionCapability NUCLEUS:
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  Essence:                                                               │
+  │    UserAgentRegistry   — dict[str, type[OctopussyAgent]]               │
+  │    AgentClassValidator — validates OctopussyAgent subclass contract     │
+  │    AgentClassLoader    — dynamic import from plugin packages            │
+  │                                                                         │
+  │  Realization:                                                           │
+  │    UserAgentRegistryStore — SQLite persistence of registered types      │
+  │    PluginModuleImporter   — importlib.import_module() wrapper           │
+  │                                                                         │
+  │  Adaptation:                                                            │
+  │    UserAgentExtensionAdapter — implements UserAgentRegistryPort         │
+  │      .register_agent_class(agent_type, agent_class)                    │
+  │      .resolve_agent_class(agent_type) → type[OctopussyAgent]           │
+  │      .list_registered_types() → list[str]                              │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+
+D-20 — PROJECT DIRECTORY STRUCTURE (ANNOTATED)
+
+Spec ref: §17.1 — Project Directory Structure
+Purpose: Complete annotated directory tree. Every file is identified with its role. This is the implementation blueprint for the project layout.
+
+octopussy/                               ← Python package root
+├── pyproject.toml                       ← build config; deps; entry points
+├── README.md
+├── LICENSE
+│
+└── octopussy/                           ← main package
+    ├── __init__.py
+    ├── main.py                          ← Entry point: asyncio.run(main())
+    │                                      Instantiates registry, OCLM, all caps
+    │
+    ├── core/                            ← CCA foundation; no business logic
+    │   ├── __init__.py
+    │   ├── enums.py                     ← ALL StrEnum/IntEnum definitions
+    │   │                                  AgentType, AgentState, MessageType,
+    │   │                                  MessagePriority, LLMRoutingStrategy,
+    │   │                                  SandboxBackend, CircuitBreakerState,
+    │   │                                  DeploymentProfile, CommunicationProtocol,
+    │   │                                  PluginType, ExecutionMode
+    │   │
+    │   ├── message.py                   ← OctopussyMessage (frozen dataclass)
+    │   │                                  .create() factory method
+    │   │                                  .verify_signature() → bool
+    │   │                                  .is_expired() → bool
+    │   │
+    │   ├── registry.py                  ← OctopussyCapabilityRegistry
+    │   │                                  .register(name, instance, dependencies)
+    │   │                                  .topological_order() → list[str]
+    │   │                                  Kahn's algorithm; CircularDependencyError
+    │   │
+    │   ├── lifecycle_manager.py         ← OctopussyCapabilityLifecycleManager (OCLM)
+    │   │                                  .startup() → runs all 6 phases in topo order
+    │   │                                  .shutdown() → runs stop+cleanup in reverse
+    │   │
+    │   ├── capability_factory.py        ← CapabilityFactory
+    │   │                                  .create(cls, config) → Capability instance
+    │   │
+    │   ├── models/
+    │   │   ├── agent_spec.py            ← ALL frozen dataclasses:
+    │   │   │                              LLMIntelligenceSpec, PermissionsSpec,
+    │   │   │                              SandboxSpec, TokenBudgetSpec,
+    │   │   │                              RAGSpec, GraphRAGSpec, SchedulerSpec,
+    │   │   │                              MCPServerSpec, AgentSpec, TeamSpec
+    │   │   │
+    │   │   └── agent_info.py            ← AgentHandle, AgentInfo, TaskHandle,
+    │   │                                  TeamHandle, AgentContext
+    │   │
+    │   └── ports/
+    │       ├── ports.py                 ← Core port ABCs:
+    │       │                              ObservabilityPort, SecurityPort,
+    │       │                              SecretsPort, ConfigurationPort,
+    │       │                              TokenBudgetPort, AgentLifecyclePort,
+    │       │                              ToolExecutorPort, SandboxPort,
+    │       │                              MemoryPort, UserAgentRegistryPort
+    │       │
+    │       ├── llm_ports.py             ← LLMPort (ABC), VLMPort (ABC)
+    │       │                              LLMRequest, LLMCompletion dataclasses
+    │       │                              OllamaLLMPort, LMStudioLLMPort,
+    │       │                              vLLMLLMPort, SGLangLLMPort,
+    │       │                              HuggingFaceLLMPort, MLXLLMPort,
+    │       │                              OpenAILLMPort, AnthropicLLMPort,
+    │       │                              GoogleGeminiLLMPort, AWSBedrockLLMPort,
+    │       │                              AzureOpenAILLMPort,
+    │       │                              OllamaVLMPort, OpenAIVLMPort,
+    │       │                              AnthropicVLMPort
+    │       │
+    │       ├── rag_ports.py             ← RAGPort (ABC)
+    │       │                              ChromaDBRAGPort, PGVectorRAGPort,
+    │       │                              WeaviateRAGPort, QdrantRAGPort,
+    │       │                              MilvusRAGPort
+    │       │
+    │       ├── graph_ports.py           ← GraphPort (ABC)
+    │       │                              Neo4jGraphPort, ArangoDBGraphPort,
+    │       │                              TigerGraphGraphPort
+    │       │
+    │       ├── communication_ports.py   ← CommunicationPort (ABC)
+    │       │                              NATSCommunicationPort,
+    │       │                              RabbitMQCommunicationPort,
+    │       │                              InMemoryCommunicationPort,
+    │       │                              RESTCommunicationPort,
+    │       │                              GRPCCommunicationPort,
+    │       │                              WebSocketCommunicationPort,
+    │       │                              MCPCommunicationPort
+    │       │
+    │       └── dlq_port.py              ← DLQPort (ABC)
+    │                                      .get_messages() → list[dict]
+    │                                      .replay(dlq_entry_id)
+    │                                      .discard(dlq_entry_id)
+    │                                      .size() → int
+    │
+    ├── capabilities/                    ← All 27 Capability implementations
+    │   │
+    │   ├── registration.py              ← register_all_capabilities()
+    │   │                                  Calls registry.register() for all 27
+    │   │                                  in dependency order
+    │   │
+    │   ├── secrets/                     ← [1] SecretsCapability
+    │   │   ├── contract.py
+    │   │   ├── essence/
+    │   │   │   └── secret_manager.py
+    │   │   ├── realization/
+    │   │   │   ├── local_encrypted_store.py
+    │   │   │   └── vault_adapter.py
+    │   │   └── adaptation/
+    │   │       └── secrets_adapter.py
+    │   │
+    │   ├── configuration/               ← [2] ConfigurationCapability
+    │   │   ├── contract.py
+    │   │   ├── essence/
+    │   │   │   ├── config_loader.py
+    │   │   │   └── file_watcher.py      ← Observer pattern; config hot-reload
+    │   │   └── adaptation/
+    │   │       └── configuration_adapter.py
+    │   │
+    │   ├── observability/               ← [3] ObservabilityCapability [SIDECAR]
+    │   │   ├── contract.py
+    │   │   ├── essence/
+    │   │   │   ├── tracing_engine.py    ← OpenTelemetry distributed tracing
+    │   │   │   ├── logging_engine.py    ← Structured log emission
+    │   │   │   ├── metrics_engine.py    ← Prometheus metrics
+    │   │   │   └── audit_engine.py      ← Immutable JSONL audit log
+    │   │   ├── realization/
+    │   │   │   ├── otlp_exporter.py     ← Exports to OTLP endpoint (port 4317)
+    │   │   │   └── prometheus_exporter.py ← Exposes metrics (port 9090)
+    │   │   └── adaptation/
+    │   │       └── observability_adapter.py
+    │   │
+    │   ├── security/                    ← [4] SecurityCapability
+    │   │   ├── contract.py
+    │   │   └── adaptation/
+    │   │       └── security_adapter.py
+    │   │
+    │   ├── messaging/                   ← [5] MessagingCapability
+    │   │   ├── contract.py
+    │   │   ├── essence/
+    │   │   │   ├── message_router.py
+    │   │   │   ├── dead_letter_queue.py
+    │   │   │   └── message_validator.py
+    │   │   ├── realization/
+    │   │   │   ├── nats_adapter.py
+    │   │   │   ├── rabbitmq_adapter.py
+    │   │   │   ├── in_memory_bus_adapter.py
+    │   │   │   └── dlq_store.py         ← SQLite DLQ persistence
+    │   │   └── adaptation/
+    │   │       └── messaging_adapter.py
+    │   │
+    │   ├── plugin/                      ← [6] PluginCapability
+    │   │   ├── contract.py
+    │   │   ├── essence/
+    │   │   │   ├── plugin_registry.py
+    │   │   │   └── hot_reload_manager.py
+    │   │   ├── realization/
+    │   │   │   ├── python_module_loader.py
+    │   │   │   └── plugin_state_store.py
+    │   │   ├── adaptation/
+    │   │   │   └── plugin_adapter.py
+    │   │   └── mcp_server.py            ← OctopussyMCPServer (MCP 2025-11-25)
+    │   │
+    │   ├── sandbox/                     ← [7] SandboxCapability
+    │   │   ├── contract.py
+    │   │   ├── essence/
+    │   │   │   ├── sandbox_provisioner.py
+    │   │   │   └── resource_limiter.py
+    │   │   ├── realization/
+    │   │   │   ├── docker_sandbox.py
+    │   │   │   ├── gvisor_sandbox.py
+    │   │   │   ├── seccomp_sandbox.py
+    │   │   │   └── macos_sandbox.py
+    │   │   └── adaptation/
+    │   │       └── sandbox_adapter.py
+    │   │
+    │   ├── tool_registry/               ← [8] ToolRegistryCapability
+    │   │   ├── contract.py
+    │   │   ├── essence/
+    │   │   │   ├── tool_registry.py
+    │   │   │   ├── permission_checker.py
+    │   │   │   └── tool_result_validator.py
+    │   │   ├── realization/
+    │   │   │   ├── sandboxed_tool_runner.py
+    │   │   │   └── tool_descriptor_store.py
+    │   │   └── adaptation/
+    │   │       └── tool_registry_adapter.py
+    │   │
+    │   ├── llm_router/                  ← [9] LLMRouterCapability
+    │   │   ├── contract.py
+    │   │   ├── essence/
+    │   │   │   ├── routing_engine.py    ← Strategy: COST/QUALITY/BALANCED/LOCAL/CLOUD
+    │   │   │   ├── health_checker.py
+    │   │   │   └── fallback_chain_resolver.py
+    │   │   ├── realization/
+    │   │   │   ├── routing_table_store.py
+    │   │   │   └── gpu_detector.py      ← CUDA/Metal/ROCm detection
+    │   │   └── adaptation/
+    │   │       └── llm_router_adapter.py
+    │   │
+    │   ├── memory/                      ← [10] MemoryCapability
+    │   │   ├── contract.py
+    │   │   ├── essence/
+    │   │   │   ├── long_term_memory_store.py
+    │   │   │   └── semantic_memory_search.py
+    │   │   ├── realization/
+    │   │   │   ├── sqlite_memory_backend.py
+    │   │   │   ├── redis_memory_backend.py
+    │   │   │   ├── postgresql_memory_backend.py
+    │   │   │   └── embedding_search_engine.py ← sentence-transformers
+    │   │   └── adaptation/
+    │   │       └── memory_adapter.py
+    │   │
+    │   ├── rag/                         ← [11] RAGCapability
+    │   │   ├── contract.py
+    │   │   └── adaptation/
+    │   │       └── rag_adapter.py
+    │   │
+    │   ├── graph_rag/                   ← [12] GraphRAGCapability
+    │   │   ├── contract.py
+    │   │   └── adaptation/
+    │   │       └── graph_rag_adapter.py
+    │   │
+    │   ├── token_budget/                ← [13] TokenBudgetCapability
+    │   │   ├── contract.py
+    │   │   ├── essence/
+    │   │   │   ├── budget_enforcer.py
+    │   │   │   └── usage_accumulator.py
+    │   │   ├── realization/
+    │   │   │   └── budget_store.py
+    │   │   └── adaptation/
+    │   │       └── token_budget_adapter.py
+    │   │
+    │   ├── prompt_engine/               ← [14] PromptEngineCapability
+    │   │   ├── contract.py
+    │   │   ├── essence/
+    │   │   │   ├── prompt_catalog.py
+    │   │   │   ├── prompt_renderer.py
+    │   │   │   └── prompt_validator.py
+    │   │   ├── realization/
+    │   │   │   └── markdown_prompt_loader.py
+    │   │   └── adaptation/
+    │   │       └── prompt_engine_adapter.py
+    │   │
+    │   ├── user_agent_extension/        ← [15] UserAgentExtensionCapability [NEW v5.0]
+    │   │   ├── contract.py
+    │   │   ├── essence/
+    │   │   │   ├── user_agent_registry.py
+    │   │   │   ├── agent_class_validator.py
+    │   │   │   └── agent_class_loader.py
+    │   │   ├── realization/
+    │   │   │   ├── user_agent_registry_store.py
+    │   │   │   └── plugin_module_importer.py
+    │   │   └── adaptation/
+    │   │       └── user_agent_extension_adapter.py
+    │   │
+    │   ├── actor/                       ← [16] ActorCapability
+    │   │   ├── contract.py
+    │   │   ├── essence/
+    │   │   │   ├── agent_base.py        ← OctopussyAgent ABC
+    │   │   │   ├── agent_types.py       ← StatelessOneShot, StatefulLoop,
+    │   │   │   │                          ScheduledTaskDaemon
+    │   │   │   ├── agent_state_machine.py
+    │   │   │   ├── message_dispatcher.py
+    │   │   │   ├── token_budget_monitor.py
+    │   │   │   ├── heartbeat_emitter.py
+    │   │   │   ├── loop_guard.py        ← LoopLimitExceededError
+    │   │   │   ├── conversation_memory.py
+    │   │   │   └── reflection_engine.py ← ReAct / Reflection patterns
+    │   │   ├── realization/
+    │   │   │   ├── llm_port_adapter.py  ← Circuit Breaker + Retry+Backoff
+    │   │   │   ├── vlm_port_adapter.py
+    │   │   │   ├── mcp_client_adapter.py ← MCP 2025-11-25 Streamable HTTP
+    │   │   │   └── state_store.py
+    │   │   └── adaptation/
+    │   │       └── actor_adapter.py
+    │   │
+    │   ├── agent_lifecycle/             ← [17] AgentLifecycleManagerCapability
+    │   │   ├── contract.py
+    │   │   ├── essence/
+    │   │   │   ├── lifecycle_registry.py
+    │   │   │   └── health_monitor.py
+    │   │   └── adaptation/
+    │   │       └── agent_lifecycle_adapter.py
+    │   │
+    │   ├── agent_factory/               ← [18] AgentFactoryCapability
+    │   │   ├── contract.py
+    │   │   ├── essence/
+    │   │   │   ├── agent_spec_builder.py
+    │   │   │   ├── agent_config_validator.py
+    │   │   │   └── agent_instantiator.py ← delegates to UserAgentRegistryPort
+    │   │   ├── realization/
+    │   │   │   ├── markdown_config_parser.py
+    │   │   │   ├── json_file_reader.py
+    │   │   │   ├── agent_spec_cache.py
+    │   │   │   └── configuration_store.py
+    │   │   └── adaptation/
+    │   │       └── agent_factory_adapter.py
+    │   │
+    │   ├── critique/                    ← [19] CritiqueCapability
+    │   │   ├── contract.py
+    │   │   └── adaptation/
+    │   │       └── critique_adapter.py
+    │   │
+    │   ├── scheduler/                   ← [20] SchedulerCapability
+    │   │   ├── contract.py
+    │   │   ├── essence/
+    │   │   │   ├── cron_engine.py
+    │   │   │   └── task_trigger.py
+    │   │   ├── realization/
+    │   │   │   └── apscheduler_adapter.py ← APScheduler backend
+    │   │   └── adaptation/
+    │   │       └── scheduler_adapter.py
+    │   │
+    │   ├── team/                        ← [21] TeamCapability
+    │   │   ├── contract.py
+    │   │   ├── essence/
+    │   │   │   ├── coordinator_worker_engine.py
+    │   │   │   ├── pipeline_engine.py
+    │   │   │   ├── mesh_blackboard_engine.py
+    │   │   │   └── tree_engine.py
+    │   │   ├── realization/
+    │   │   │   ├── blackboard_store.py  ← Redis-backed shared blackboard
+    │   │   │   └── team_state_store.py  ← SQLite team state
+    │   │   └── adaptation/
+    │   │       └── team_adapter.py
+    │   │
+    │   ├── comm_adapter/                ← [22] CommunicationAdapterCapability
+    │   │   ├── contract.py
+    │   │   ├── essence/
+    │   │   │   ├── channel_registry.py
+    │   │   │   └── message_bridge.py
+    │   │   └── adaptation/
+    │   │       └── comm_adapter_adapter.py
+    │   │
+    │   ├── user_session/                ← [23] UserSessionCapability
+    │   │   ├── contract.py
+    │   │   └── adaptation/
+    │   │       └── user_session_adapter.py
+    │   │
+    │   ├── speech/                      ← [24] SpeechCapability
+    │   │   ├── contract.py              ← STT: openai-whisper; TTS: piper-tts
+    │   │   └── adaptation/
+    │   │       └── speech_adapter.py
+    │   │
+    │   ├── orchestrator/                ← [25] OrchestratorCapability
+    │   │   ├── contract.py
+    │   │   ├── essence/
+    │   │   │   ├── task_router.py       ← Routes tasks to best available agent
+    │   │   │   ├── agent_graph_renderer.py ← DOT/JSON/SVG graph rendering
+    │   │   │   └── system_status_aggregator.py
+    │   │   ├── realization/
+    │   │   │   ├── rest_api_server.py   ← FastAPI on port 47200
+    │   │   │   └── task_result_store.py ← SQLite task results
+    │   │   └── adaptation/
+    │   │       └── orchestrator_adapter.py
+    │   │
+    │   ├── cli/                         ← [26] CLICapability
+    │   │   ├── contract.py
+    │   │   └── adaptation/
+    │   │       └── cli_adapter.py
+    │   │
+    │   └── webui/                       ← [27] WebUICapability
+    │       ├── contract.py              ← FastAPI /ui/ + WSS port 47202
+    │       └── adaptation/
+    │           └── webui_adapter.py
+    │
+    └── plugins/                         ← Built-in tool implementations
+        └── tools/
+            ├── web/
+            │   ├── web_search_tool.py
+            │   └── web_download_tool.py
+            ├── file_ops/
+            │   ├── file_read_tool.py
+            │   ├── file_write_tool.py
+            │   ├── file_list_tool.py
+            │   └── file_delete_tool.py
+            ├── system/
+            │   ├── os_command_tool.py
+            │   └── python_exec_tool.py
+            ├── memory/
+            │   ├── memory_store_tool.py
+            │   ├── memory_retrieve_tool.py
+            │   └── memory_search_tool.py
+            ├── rag/
+            │   ├── rag_ingest_tool.py
+            │   └── rag_retrieve_tool.py
+            ├── graph/
+            │   ├── graph_query_tool.py
+            │   └── graph_upsert_tool.py
+            └── communication/
+                ├── mail_send_tool.py
+                ├── calendar_read_tool.py
+                ├── calendar_write_tool.py
+                ├── ui_automation_tool.py
+                ├── speech_transcribe_tool.py
+                └── speech_synthesize_tool.py
+
+
+ADDENDUM SUMMARY — IMPLEMENTATION CHECKLIST
+
+Use this checklist when prompting an LLM to implement Octopussy. Each item maps to one or more diagrams above.
+
+IMPLEMENTATION ORDER (follow startup sequence from D-04):
+
+ □  1. core/enums.py              — all enums (D-01, D-07)
+ □  2. core/message.py            — OctopussyMessage (D-06)
+ □  3. core/models/agent_spec.py  — all frozen dataclasses (D-08, D-17)
+ □  4. core/models/agent_info.py  — handles and info types (D-17)
+ □  5. core/ports/ports.py        — core port ABCs (D-16)
+ □  6. core/ports/llm_ports.py    — LLM/VLM ports (D-11, D-16)
+ □  7. core/ports/rag_ports.py    — RAG ports (D-16)
+ □  8. core/ports/graph_ports.py  — Graph ports (D-16)
+ □  9. core/ports/communication_ports.py — comm ports (D-09, D-16)
+ □ 10. core/ports/dlq_port.py     — DLQ port (D-09)
+ □ 11. core/registry.py           — CapabilityRegistry + Kahn's algo (D-03, D-04)
+ □ 12. core/lifecycle_manager.py  — OCLM 6-phase lifecycle (D-03)
+ □ 13. core/capability_factory.py — CapabilityFactory (D-02)
+ □ 14. capabilities/secrets/      — SecretsCapability (D-02, D-05)
+ □ 15. capabilities/configuration/ — ConfigurationCapability (D-02, D-05)
+ □ 16. capabilities/observability/ — ObservabilityCapability sidecar (D-02, D-05)
+ □ 17. capabilities/security/     — SecurityCapability (D-10)
+ □ 18. capabilities/messaging/    — MessagingCapability + DLQ (D-09)
+ □ 19. capabilities/plugin/       — PluginCapability + MCPServer (D-14)
+ □ 20. capabilities/sandbox/      — SandboxCapability (D-18)
+ □ 21. capabilities/tool_registry/ — ToolRegistryCapability (D-18)
+ □ 22. capabilities/llm_router/   — LLMRouterCapability (D-11)
+ □ 23. capabilities/memory/       — MemoryCapability (D-16)
+ □ 24. capabilities/rag/          — RAGCapability (D-16)
+ □ 25. capabilities/graph_rag/    — GraphRAGCapability (D-16)
+ □ 26. capabilities/token_budget/ — TokenBudgetCapability (D-08)
+ □ 27. capabilities/prompt_engine/ — PromptEngineCapability (D-08)
+ □ 28. capabilities/user_agent_extension/ — UserAgentExtensionCapability (D-19)
+ □ 29. capabilities/actor/essence/agent_state_machine.py — AgentStateMachine (D-07)
+ □ 30. capabilities/actor/essence/agent_base.py — OctopussyAgent ABC (D-08)
+ □ 31. capabilities/actor/essence/agent_types.py — 3 built-in agent types (D-08)
+ □ 32. capabilities/actor/realization/ — LLMPortAdapter, MCPClientAdapter (D-11, D-13)
+ □ 33. capabilities/agent_lifecycle/ — AgentLifecycleManagerCapability (D-17)
+ □ 34. capabilities/agent_factory/  — AgentFactoryCapability (D-17)
+ □ 35. capabilities/critique/       — CritiqueCapability (D-01)
+ □ 36. capabilities/scheduler/      — SchedulerCapability (D-01)
+ □ 37. capabilities/team/           — TeamCapability + 4 engines (D-12)
+ □ 38. capabilities/comm_adapter/   — CommunicationAdapterCapability (D-15)
+ □ 39. capabilities/user_session/   — UserSessionCapability (D-01)
+ □ 40. capabilities/speech/         — SpeechCapability (D-01)
+ □ 41. capabilities/orchestrator/   — OrchestratorCapability (D-05)
+ □ 42. capabilities/cli/            — CLICapability (D-01)
+ □ 43. capabilities/webui/          — WebUICapability (D-01)
+ □ 44. capabilities/registration.py — register_all_capabilities() (D-05)
+ □ 45. plugins/tools/               — all 18 built-in tools (D-18)
+ □ 46. main.py                      — system entry point (D-03, D-04)
+
+KEY INVARIANTS TO ENFORCE IN EVERY FILE:
+ ✓ All Capabilities: async def everywhere; no blocking I/O
+ ✓ All messages: OctopussyMessage only; frozen=True; HMAC mandatory
+ ✓ All ports: injected via inject_dependency() only; no service locator
+ ✓ All tool calls: MCPClientAdapter only; MCP-Protocol-Version: 2025-11-25
+ ✓ All secrets: SecretsCapability only; never in config files
+ ✓ All Capabilities: created via CapabilityFactory only
+ ✓ Security: deny-by-default; HMAC bytes never Optional; TOTP for SUPERUSER/ADMIN
+ ✓ DLQ: never silently discard; persist in SQLite; survive restarts
+
+
+End of Octopussy v5.0 Architecture Addendum — 20 Diagrams — 🐙
+This addendum is normative and implementation-authoritative. All diagrams are derived exclusively from the Octopussy Architecture Specification v5.0.0 (2026-03-24). Feed this document together with the main specification to an LLM for complete, correct implementation.

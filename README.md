@@ -1,4 +1,5 @@
-<img width="1024" height="1024" alt="image" src="https://github.com/user-attachments/assets/2221ba23-89f3-4d39-9f5d-999224767a60" />
+<img width="1024" height="1024" alt="image" src="https://github.com/user-attachments/assets/11d2760b-5c45-4663-9233-277c487109a6" />
+
 
 # Octopussy
 Octopussy is an Open Source Agentic AI System. It substantially extends what agent platforms like OpenClaw provide in terms of architecture soundness, security, versatility, extensibility, efficiency and reliability. 

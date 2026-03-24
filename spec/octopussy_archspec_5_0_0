@@ -1,4 +1,4 @@
-Octopussy Architecture Specification &amp; Implementation Skeleton v5.0
+Octopussy Architecture Specification & Implementation Skeleton v5.0
 Corrected, Completed, Fully CCA 0.2–Compliant, with User-Agent Extension Framework
 
 Document Status: Production-Ready (v5.0 — All Issues Resolved)
@@ -10,7 +10,7 @@ Date: 2026-03-24
 
 TABLE OF CONTENTS
 
-Vision &amp; Positioning
+Vision & Positioning
 Architectural Foundations
 System-Level CCA Capability Map
 Core Capabilities — Detailed Specification
@@ -21,7 +21,7 @@ Core Capabilities — Detailed Specification
 4.4 TeamCapability
 4.5 LLMRouterCapability
 4.6 MemoryCapability
-4.7 RAGCapability &amp; GraphRAGCapability
+4.7 RAGCapability & GraphRAGCapability
 4.8 ToolRegistryCapability
 4.9 PluginCapability
 4.10 MessagingCapability
@@ -44,8 +44,8 @@ Core Capabilities — Detailed Specification
 
 
 Built-in Tools Catalogue
-Actor Model &amp; Agent Architecture
-Team Patterns &amp; Multi-Agent Architecture
+Actor Model & Agent Architecture
+Team Patterns & Multi-Agent Architecture
 Messaging Architecture
 LLM/VLM Port Architecture
 Security Architecture
@@ -56,11 +56,11 @@ Plugin Architecture
 Design Patterns Reference Matrix
 Quality Attribute Realization
 Implementation Skeleton
-Evolution &amp; Versioning Policy
+Evolution & Versioning Policy
 Appendix A: Open Source Stack
 
 
-1. VISION &amp; POSITIONING
+1. VISION & POSITIONING
 1.1 What Is Octopussy?
 Octopussy is a production-grade, open-source, agentic AI platform built entirely on Capability-Centric Architecture (CCA) 0.2 by Michael Stal. It enables individuals, teams, and organizations to deploy autonomous AI agents — individually or in coordinated multi-agent teams — across any platform: macOS, Windows, Linux, single-board computers (Raspberry Pi, Jetson Nano), Docker containers, and Kubernetes clusters.
 Octopussy is the operating system for autonomous AI agents: it handles agent lifecycle, LLM routing, memory, RAG, security, sandboxing, token budgets, scheduling, multi-agent coordination, observability, and extensibility — so developers focus exclusively on agent goals and behaviors.
@@ -142,7 +142,7 @@ Dynamic Actor model with AgentFactory + user-extensible agents
 
 Installation
 Complex, multi-step
-pip install octopussy &amp;&amp; octopussy install
+pip install octopussy && octopussy install
 
 
 Agent Creation
@@ -777,7 +777,7 @@ class UserAgentRegistryPort(ABC):
         """List all registered user-defined agent classes with metadata."""
         ...
 
-4.0.4 LLM Ports &amp; VLM Ports (Complete — All Providers)
+4.0.4 LLM Ports & VLM Ports (Complete — All Providers)
 # octopussy/core/ports/llm_ports.py
 
 from __future__ import annotations
@@ -931,7 +931,7 @@ class AzureOpenAIVLMPort(VLMPort):
     async def complete_vision(self, request: LLMRequest, image_bytes: bytes) -> LLMCompletion: ...
     async def health_check(self) -> bool: ...
 
-4.0.5 RAG Ports &amp; Graph Ports (Complete)
+4.0.5 RAG Ports & Graph Ports (Complete)
 # octopussy/core/ports/rag_ports.py
 
 from __future__ import annotations
@@ -1222,7 +1222,7 @@ class DLQPort(ABC):
         """Return the current number of entries in the DLQ."""
         ...
 
-4.0.8 Agent Spec &amp; Related Dataclasses
+4.0.8 Agent Spec & Related Dataclasses
 # octopussy/core/models/agent_spec.py
 
 from __future__ import annotations
@@ -2144,7 +2144,7 @@ DEPRECATION_POLICY     = "12 months notice before removal of any Contract method
 MIGRATION_GUIDE        = "docs/migration/memory_5_0.md"
 
 
-4.7 RAGCapability &amp; GraphRAGCapability
+4.7 RAGCapability & GraphRAGCapability
 # octopussy/capabilities/rag/contract.py
 
 from __future__ import annotations
@@ -3637,7 +3637,7 @@ The plugin module path
 
 Custom tools can be added via TOOL_PLUGIN plugins without modifying core code.
 
-6. ACTOR MODEL &amp; AGENT ARCHITECTURE
+6. ACTOR MODEL & AGENT ARCHITECTURE
 OctopussyAgent (ABC)
 │
 ├── StatelessOneShot          — executes once, returns result, terminates
@@ -3662,7 +3662,7 @@ IDLE → PAUSED → IDLE
 IDLE → STOPPING → STOPPED
 
 
-7. TEAM PATTERNS &amp; MULTI-AGENT ARCHITECTURE
+7. TEAM PATTERNS & MULTI-AGENT ARCHITECTURE
 
 
 
@@ -4542,7 +4542,7 @@ octopussy/
 │               ├── calendar_write_tool.py
 │               └── ui_automation_tool.py
 
-17.2 Capability Registry &amp; Lifecycle Manager
+17.2 Capability Registry & Lifecycle Manager
 # octopussy/core/registry.py
 
 from __future__ import annotations
@@ -4916,7 +4916,7 @@ def register_all_capabilities(registry: OctopussyCapabilityRegistry) -> None:
     )
 
 
-18. EVOLUTION &amp; VERSIONING POLICY
+18. EVOLUTION & VERSIONING POLICY
 
 Semantic versioning: Every Capability carries CAPABILITY_VERSION and MINIMUM_CLIENT_VERSION.
 Deprecation policy: 12 months notice before removal of any Contract method.
@@ -5067,7 +5067,7 @@ Python 3.11+ stdlib
 
 
 
-End of Octopussy Architecture Specification &amp; Implementation Skeleton v5.0 🐙
+End of Octopussy Architecture Specification & Implementation Skeleton v5.0 🐙
 
 
 v5.0 Summary of Changes from v4.0.1:
@@ -5081,15 +5081,15 @@ Diagram D-02: Capability Lifecycle (6-phase CCA lifecycle + OCLM)
 Diagram D-03: Capability Startup/Shutdown Order (topological sequence)
 Diagram D-04: Capability Nucleus Internal Structure (Essence/Realization/Adaptation)
 Diagram D-05: Full Capability Dependency Graph (all 27 Capabilities with their injected ports)
-Diagram D-06: OctopussyMessage Structure &amp; Lifecycle (fields + processing chain)
+Diagram D-06: OctopussyMessage Structure & Lifecycle (fields + processing chain)
 Diagram D-07: Agent State Machine
-Diagram D-08: Actor Model &amp; Agent Architecture (OctopussyAgent hierarchy + internal loops)
+Diagram D-08: Actor Model & Agent Architecture (OctopussyAgent hierarchy + internal loops)
 Diagram D-09: Message Flow / Messaging Architecture (sender → bus → receiver)
 Diagram D-10: Security Zero-Trust Enforcement Chain
 Diagram D-11: LLM/VLM Router Architecture
 Diagram D-12: Team Patterns (all 4 patterns)
 Diagram D-13: MCP Integration Architecture
-Diagram D-14: Plugin Architecture &amp; Lifecycle
+Diagram D-14: Plugin Architecture & Lifecycle
 Diagram D-15: Deployment Architecture (4 profiles)
 Diagram D-16: Port Interface Taxonomy (all port types)
 Diagram D-17: Agent Creation Workflow (factory flow)
@@ -5100,7 +5100,7 @@ Diagram D-20: Project Directory Structure (annotated)
 All diagrams use pure ASCII/text art (no external rendering needed), making them directly usable by an LLM for implementation.
 
 OCTOPUSSY v5.0 — ARCHITECTURE ADDENDUM
-Comprehensive Workflow &amp; Architecture Diagrams
+Comprehensive Workflow & Architecture Diagrams
 Addendum Version: 1.0 | Spec Version: 5.0.0 | Date: 2026-03-24
 Purpose: Companion to the Octopussy Architecture Specification v5.0. Provides all workflow and architecture diagrams required for complete implementation by an LLM. All diagrams are derived exclusively from the normative specification and are implementation-authoritative.
 
@@ -5135,7 +5135,7 @@ Capability Lifecycle — Six Phases (OCLM)
 
 
 D-04
-Capability Startup &amp; Shutdown Order
+Capability Startup & Shutdown Order
 §3
 
 
@@ -5145,7 +5145,7 @@ Full Capability Dependency Graph
 
 
 D-06
-OctopussyMessage — Structure &amp; Processing Chain
+OctopussyMessage — Structure & Processing Chain
 §4.0.2, §8
 
 
@@ -5155,7 +5155,7 @@ Agent State Machine
 
 
 D-08
-Actor Model &amp; Agent Internal Architecture
+Actor Model & Agent Internal Architecture
 §6
 
 
@@ -5185,7 +5185,7 @@ MCP Integration Architecture (2025-11-25)
 
 
 D-14
-Plugin Architecture &amp; Plugin Lifecycle
+Plugin Architecture & Plugin Lifecycle
 §15
 
 
@@ -5437,7 +5437,7 @@ Purpose: Every Capability passes through exactly these six phases in order. The 
   WebUICapability → CLICapability → OrchestratorCapability → ... → SecretsCapability
 
 
-D-04 — CAPABILITY STARTUP &amp; SHUTDOWN ORDER
+D-04 — CAPABILITY STARTUP & SHUTDOWN ORDER
 
 Spec ref: §3 — Startup order (topological, computed by Kahn's algorithm)
 Purpose: The exact, normative startup sequence. Shutdown is the strict reverse. Critical for implementing registry.py and lifecycle_manager.py.
@@ -5461,7 +5461,7 @@ STARTUP ORDER (topological — Kahn's algorithm on dependency DAG)
   12    GraphRAGCapability                Knowledge
   13    TokenBudgetCapability             Knowledge
   14    PromptEngineCapability            Knowledge
-  15    UserAgentExtensionCapability      Extensibility  ◄── NEW v5.0; must precede 16 &amp; 17
+  15    UserAgentExtensionCapability      Extensibility  ◄── NEW v5.0; must precede 16 & 17
   16    ActorCapability                   Agent
   17    AgentLifecycleManagerCapability   Agent
   18    AgentFactoryCapability            Agent
@@ -5602,7 +5602,7 @@ CommunicationAdapterCapability  ◄───────────────
   (provides channel adapters consumed by external systems)
 
 
-D-06 — OCTOPUSSYMESSAGE — STRUCTURE &amp; PROCESSING CHAIN
+D-06 — OCTOPUSSYMESSAGE — STRUCTURE & PROCESSING CHAIN
 
 Spec ref: §4.0.2 — OctopussyMessage; §8 — Messaging Architecture
 Purpose: Defines the immutable message type that is the ONLY communication vehicle in the system. Shows all fields and the complete processing chain every message passes through.
@@ -5682,7 +5682,7 @@ MESSAGE PROCESSING CHAIN (Chain of Responsibility in _message_loop):
 
 D-07 — AGENT STATE MACHINE
 
-Spec ref: §6 — Actor Model &amp; Agent Architecture
+Spec ref: §6 — Actor Model & Agent Architecture
 Purpose: The AgentStateMachine enforces valid state transitions. All invalid transitions must be rejected. Critical for implementing agent_state_machine.py.
 
                     AgentStateMachine
@@ -5741,9 +5741,9 @@ Purpose: The AgentStateMachine enforces valid state transitions. All invalid tra
   PERSISTENCE: State stored in StateStore (SQLite) for crash recovery.
 
 
-D-08 — ACTOR MODEL &amp; AGENT INTERNAL ARCHITECTURE
+D-08 — ACTOR MODEL & AGENT INTERNAL ARCHITECTURE
 
-Spec ref: §6 — Actor Model &amp; Agent Architecture
+Spec ref: §6 — Actor Model & Agent Architecture
 Purpose: Shows the complete internal structure of every OctopussyAgent instance, its three asyncio tasks, injected ports, and subtype hierarchy.
 
 OctopussyAgent (ABC)  [octopussy/capabilities/actor/essence/agent_base.py]
@@ -6132,7 +6132,7 @@ Purpose: Shows how LLMRouterCapability resolves the correct LLM/VLM provider for
 
 D-12 — TEAM PATTERNS — ALL FOUR MULTI-AGENT PATTERNS
 
-Spec ref: §7 — Team Patterns &amp; Multi-Agent Architecture
+Spec ref: §7 — Team Patterns & Multi-Agent Architecture
 Purpose: Shows the exact message flow and agent topology for each of the four team patterns. Critical for implementing the four engine classes in TeamCapability.
 
 ════════════════════════════════════════════════════════════════════════════
@@ -6334,7 +6334,7 @@ Purpose: All tool calls in Octopussy are routed exclusively through MCP 2025-11-
   └─────────────────────────────────────────────────────────────────────────┘
 
 
-D-14 — PLUGIN ARCHITECTURE &amp; PLUGIN LIFECYCLE
+D-14 — PLUGIN ARCHITECTURE & PLUGIN LIFECYCLE
 
 Spec ref: §15 — Plugin Architecture
 Purpose: Shows all 10 plugin types, the plugin manifest format, and the complete plugin lifecycle from load to hot-reload to unload.
